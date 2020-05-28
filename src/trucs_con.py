@@ -2,7 +2,8 @@
 from maze import *
 import random
 
-m = Maze(50)
+random.seed(0)
+m = Maze.square(6)
 
 print(m)
 
