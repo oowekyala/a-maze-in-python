@@ -5,7 +5,6 @@ from typing import NamedTuple, Optional
 from bitarray import bitarray
 
 
-
 class Cell(NamedTuple):
     x: int
     y: int
@@ -31,6 +30,13 @@ class Cell(NamedTuple):
     @staticmethod
     def clip(w: int, h: int, cell: 'Cell') -> Optional['Cell']:
         return cell if cell.x in range(w) and cell.y in range(h) else None
+
+
+    @staticmethod
+    def iterate(w: int, h: int):
+        for x in range(0, h):
+            for y in range(0, w):
+                yield Cell(x, y)
 
     class CellSet(object):
         """
