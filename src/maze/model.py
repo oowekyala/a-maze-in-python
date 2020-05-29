@@ -1,7 +1,6 @@
 import textwrap
 from enum import Enum, unique, auto
 from typing import NamedTuple, Optional
-
 from bitarray import bitarray
 
 
@@ -122,3 +121,5 @@ class Wall(NamedTuple):
     @property
     def next_cell(self) -> Cell:
         return self.cell.next(self.side)
+
+

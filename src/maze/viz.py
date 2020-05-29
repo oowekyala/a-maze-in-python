@@ -1,9 +1,6 @@
+from maze.model import *
 from abc import abstractmethod, ABCMeta
-
-from maze.util import *
-from maze import Maze
-
-
+from enum import Enum, auto, unique
 
 @unique
 class CellState(Enum):
@@ -38,7 +35,7 @@ class Color(Enum):
 
 class GridPen(metaclass=ABCMeta):
 
-    def __init__(self, maze: Maze):
+    def __init__(self, maze: 'Maze'):
         self.__maze = maze
 
 
@@ -57,22 +54,27 @@ class GridPen(metaclass=ABCMeta):
         """Update a wall (and repaint)"""
         pass
 
-
-    def reset_maze(self, maze: Maze):
-        """Repaint the whole grid, the maze may have different dimensions"""
+    def reset_maze(self, maze: 'Maze'):
+        """Repaint the whole grid, the maze may have different dimensions (resize window)"""
         self.__maze = maze
 
+    @abstractmethod
+    def paint_everything(self):
+        """"""
+        pass
 
     @staticmethod
-    def __noop_pen(maze: Maze) -> 'GridPen':
+    def __noop_pen(maze: 'Maze') -> 'GridPen':
         class __NoopPen(GridPen):
 
             def __init__(self):
                 super().__init__(maze)
 
-            def update_cell(self, cell: Cell, state: CellState) -> None:
+            def paint_everything(self):
                 pass
 
+            def update_cell(self, cell: Cell, state: CellState) -> None:
+                pass
 
             def update_wall(self, wall: Wall, active: bool) -> None:
                 pass
