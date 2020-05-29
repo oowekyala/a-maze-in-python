@@ -1,12 +1,21 @@
 from maze.model import  *
 from maze.viz import *
-import random
+import random, time
 from typing import Callable, List, Tuple
 from abc import abstractmethod, ABCMeta
 
+
+
 class Maze(object):
-    """A maze with fixed-dimensions. Initially all cells are walled. apply_gen generates corridors
-       by breaking some walls"""
+    """A maze with fixed-dimensions. Cells are either walled or free. Initially all cells are walled.
+       apply_gen generates corridors by breaking some walls
+
+            y
+       ------->
+       |
+      x|
+       v
+       """
 
 
     def __init__(self, nrows: int, ncols: int):
@@ -17,8 +26,8 @@ class Maze(object):
         self.__nrows = nrows
         self.__ncols = ncols
 
-        self.start_cell = Cell(0, random.randint(a=0, b=nrows - 1))
-        self.end_cell = Cell(ncols - 1, random.randint(a=0, b=nrows - 1))
+        self.start_cell = Cell(x=random.randint(a=0, b=nrows - 1), y=0)
+        self.end_cell = Cell(x=random.randint(a=0, b=nrows - 1), y=ncols - 1)
 
         self.reset()
 
@@ -29,19 +38,41 @@ class Maze(object):
         gen.generate(maze=self, break_wall=lambda w: self.__break_wall(w, pen))
 
 
-    def __break_wall(self, wall: Wall, pen: GridPen):
-        self.__set_wall(wall, False)
-        pen.update_wall(wall, active=False)
+    def __break_wall(self, cell: Cell, pen: GridPen):
+        self.set_wall(cell, False)
+        pen.update_cell(cell, CellState.BLANK)
+        time.sleep(0.001)
 
 
     def reset(self):
         # 2 bitarrays: 1 for TOP walls, one for LEFT ones
         # All walls are set
-        self.__walls = {d: self.new_cell_set(True) for d in list(Direction)}
+        self.__free_cells = self.new_cell_set(False)
 
 
     def new_cell_set(self, initial_value: bool = False) -> Cell.CellSet:
-        return Cell.CellSet(height=self.height, width=self.width, initial_value=initial_value)
+        return Cell.CellSet.with_initial(height=self.height, width=self.width, initial_value=initial_value)
+
+
+    def wall_set(self) -> Cell.CellSet:
+        """Returns a new cellset containing the walls of the current maze"""
+        return ~self.__free_cells
+
+
+    def neighbors_list(self,
+                       cell: Cell,
+                       *,
+                       include_walls: bool = False,
+                       blacklist: Optional[Cell.CellSet] = None,
+                       whitelist: Optional[Cell.CellSet] = None):
+        return [c
+                for s in list(Side)
+                for c in [cell.next(s)]
+                if c in self
+                if include_walls or c in self.__free_cells
+                if (not blacklist or c not in blacklist)
+                if (not whitelist or c in whitelist)
+                ]
 
 
     @property
@@ -56,28 +87,19 @@ class Maze(object):
         return self.__ncols
 
 
-    def has_wall(self, wall: Wall) -> bool:
-        self.__check_pos(wall.cell)
-        (x, y, side) = wall
-
-        if side is Side.RIGHT:
-            return (x == self.width - 1) or self.has_wall(Wall(x + 1, y, Side.LEFT))
-        if side is Side.BOT:
-            return (y == self.height - 1) or self.has_wall(Wall(x, y + 1, Side.TOP))
-        else:
-            return wall.cell in self.__walls[side.direction()]
+    def is_wall(self, cell: Cell) -> bool:
+        return cell not in self.__free_cells
 
 
-    def __set_wall(self, wall: Wall, value: bool = True) -> None:
-        self.__check_pos(wall.cell)
-        (x, y, side) = wall
+    def is_free(self, cell: Cell) -> bool:
+        return cell in self.__free_cells
 
-        if side is Side.RIGHT and x < self.width - 1:
-            self.__set_wall(Wall(x + 1, y, Side.LEFT), value)
-        elif side is Side.BOT and y < self.height - 1:
-            self.__set_wall(Wall(x, y + 1, Side.TOP), value)
-        else:
-            self.__walls[side.direction()][wall.cell] = value
+
+    def set_wall(self, cell: Cell, is_wall: bool = True) -> None:
+        assert not (cell == self.end_cell or cell == self.start_cell) or not is_wall  # special cells cannot be walls
+
+        self.__check_pos(cell)
+        self.__free_cells[cell] = not is_wall
 
 
     def __check_pos(self, cell: Cell) -> None:
@@ -86,58 +108,39 @@ class Maze(object):
 
 
     def __contains__(self, cell: Cell) -> bool:
-        return cell.x in range(0, self.height) \
-               and cell.y in range(0, self.width)
-
+        return 0 <= cell.x < self.height and 0 <= cell.y < self.width
 
     def all_cells(self):
         return Cell.iterate(h=self.height, w=self.width)
 
 
     def __str__(self):
-        res = ""
-        for j in range(0, self.height):
-            hline = "   "
-            vline = "   "
+        hline = ("x" * (self.width + 2))
+        res = hline + "\n"
+        for x in range(self.height):
+            line = "x"
+            for y in range(self.width):
+                cell = Cell(x, y)
+                if self.is_wall(cell):
+                    line += "x"
+                elif self.start_cell == cell:
+                    line += "»"
+                elif self.end_cell == cell:
+                    line += "«"
+                else:
+                    line += " "
 
-            for i in range(0, self.width):
-                cell = Cell(i, j)
-                has_top = cell in self.__walls[Direction.VERTICAL]
-                has_left = cell in self.__walls[Direction.HORIZONTAL]
+            res += line + "x\n"
 
-                hline += "+--" if has_top else "+  "
-                vline += "|" if has_left else " "
-                vline += "<>" if self.start_cell == cell \
-                    else "><" if self.end_cell == cell \
-                    else "  "
-
-            res += hline + "+\n"
-            res += vline + "|\n"
-
-        res += "   "
-        res += ("+--" * self.width)
-        res += "+"
-
+        res += hline
         return res
 
 
-    def draw_walls(self, pen: GridPen) -> None:
-        for y in range(0, self.height):
-            for x in range(0, self.width):
-                cell = Cell(x, y)
-                if cell in self.__walls[Direction.VERTICAL]:
-                    pen.update_wall(cell.wall(Side.TOP), active=True)
-
-                if cell in self.__walls[Direction.HORIZONTAL]:
-                    pen.update_wall(cell.wall(Side.LEFT), active=True)
-
-                if y == self.height - 1:
-                    pen.update_wall(Cell(y, self.width).wall(Side.BOT), active=True)
-
-                if x == self.width - 1:
-                    pen.update_wall(Cell(y, self.width).wall(Side.RIGHT), active=True)
-
-
+    def draw_regular_tiles(self, pen: GridPen) -> None:
+        """Draw walls & blanks, special tiles are added later"""
+        for cell in self.all_cells():
+            state = CellState.WALL if self.is_wall(cell) else CellState.BLANK
+            pen.update_cell(cell, state)
 
 
 class GenerationAlgo(metaclass=ABCMeta):
@@ -145,7 +148,7 @@ class GenerationAlgo(metaclass=ABCMeta):
     @abstractmethod
     def generate(self,
                  maze: Maze,
-                 break_wall: Callable[[Wall], None]) -> None:
+                 break_wall: Callable[[Cell], None]) -> None:
         """
         Generate the maze by breaking some walls. Initially all walls are
         set.
@@ -157,25 +160,60 @@ class GenerationAlgo(metaclass=ABCMeta):
 
 
 
+class PrimGenerate(GenerationAlgo):
+
+    def generate(self,
+                 maze: Maze,
+                 break_wall: Callable[[Cell], None]) -> None:
+
+        def neighbors(cell: Cell):
+            return maze.neighbors_list(cell, include_walls=True)
+
+        for c in [maze.start_cell, maze.end_cell]:
+            break_wall(c)
+
+        walls = set(neighbors(maze.start_cell))
+
+        # While there are walls in the list:
+        # Pick a random wall from the list. If only one of the cells that the wall divides is visited, then:
+        # # Make the wall a passage and mark the unvisited cell as part of the maze.
+        # # Add the neighboring walls of the cell to the wall list.
+        # Remove the wall from the list.
+        while len(walls) > 0:
+            wall = random.choice(tuple(walls))
+            wall_neighbours = neighbors(wall)
+            neighbouring_walls = []
+            pcount = 0
+            for n in wall_neighbours:
+                if n == maze.start_cell or n == maze.end_cell:
+                    continue
+                if maze.is_free(n):
+                    pcount += 1
+                else:
+                    neighbouring_walls.append(n)
+
+            if pcount <= 1:
+                break_wall(wall)
+                walls.update(neighbouring_walls)
+
+            walls.remove(wall)
+
+
+# FIX US
+
 class DfsGenerate(GenerationAlgo):
 
     def generate(self,
                  maze: Maze,
-                 break_wall: Callable[[Wall], None]) -> None:
-
-        def can_visit_from_here(wall: Wall):
-            next_cell = wall.next_cell
-            return next_cell in maze and next_cell not in visited
-
+                 break_wall: Callable[[Cell], None]) -> None:
 
         visited = maze.new_cell_set(False)
         stack = []
         cell = Cell(0, 0)
-        neighbors = list(Side)
 
         while True:
             visited += cell
-            neighbors = [s for s in neighbors if can_visit_from_here(cell.wall(s))]  # refilter
+            neighbors = maze.neighbors_list(cell, include_walls=True, blacklist=visited)
 
             if len(neighbors) == 0:
                 if len(stack) == 0:
@@ -184,17 +222,14 @@ class DfsGenerate(GenerationAlgo):
                 continue
 
             # choose a random wall to break, continue the visit there
-            side = random.choice(neighbors)
-            wall = cell.wall(side)
-            break_wall(wall)
+            next_cell: Cell = random.choice(neighbors)
+            break_wall(next_cell)
 
-            neighbors.remove(side)
+            neighbors.remove(next_cell)
             if len(neighbors) != 0:
-                stack.append((cell, neighbors))
+                stack.append((cell, neighbors))  # save state for later
 
-            cell = wall.next_cell
-            neighbors = list(Side)
-
+            cell = next_cell
 
 
 class WilsonGenerate(GenerationAlgo):
@@ -207,9 +242,10 @@ class WilsonGenerate(GenerationAlgo):
 
     def generate(self,
                  maze: Maze,
-                 break_wall: Callable[[Wall], None]) -> None:
+                 break_wall: Callable[[Cell], None]) -> None:
 
         in_maze: Cell.CellSet = maze.new_cell_set(False)
+        visited: Cell.CellSet = maze.new_cell_set(False)
         in_path: Cell.CellSet = maze.new_cell_set(False)
 
         # start with a random cell
@@ -218,45 +254,40 @@ class WilsonGenerate(GenerationAlgo):
 
         while True:
             try:
-                cur_cell: Cell = next(c for c in maze.all_cells() if c not in in_maze)
+                cur_cell: Cell = next(c for c in maze.all_cells() if c not in in_maze and c not in visited)
             except StopIteration:  # all cells are in the maze, we're done
                 break
 
             in_path += cur_cell
-            path: List[Wall] = []
+            path: List[Cell] = []
 
             while cur_cell not in in_maze:  # loop-erased random walk until we find a maze cell
 
-                available: List[Tuple[Wall, Cell]] = [(wall, cell)
-                                                      for s in list(Side)
-                                                      for wall in [cur_cell.wall(s)]
-                                                      for cell in [wall.next_cell]
-                                                      if cell in maze]
+                available: List[Cell] = maze.neighbors_list(cur_cell, include_walls=True)
 
                 if len(available) == 0:
                     raise AssertionError("No reachable neighbour from %s" % cur_cell)
 
-                (next_wall, next_cell) = random.choice(available)
+                next_cell: Cell = random.choice(available)
 
                 if next_cell in in_path:  # loop in the path
-                    loop_start = next(i for i in range(len(path)) if path[i].cell == next_cell)
-                    for w in path[loop_start + 1:]:
-                        in_path -= w.cell
+                    loop_start = path.index(next_cell)
+                    for c in path[loop_start + 1:]:
+                        in_path -= c
 
-                    cur_cell = path[loop_start].next_cell
+                    cur_cell = path[loop_start]
 
                     path[loop_start + 1:] = []  # erase loop, eg [a,b,c,d,b] becomes [a,b]
                 else:
                     in_path += next_cell
-                    path.append(next_wall)
+                    path.append(next_cell)
 
                     cur_cell = next_cell
 
             # lastly add the whole path to the maze
 
-            for wall in path:
-                break_wall(wall)
+            for c in path:
+                break_wall(c)
 
             in_maze |= in_path
             in_path.setall(False)
-

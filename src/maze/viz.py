@@ -8,6 +8,7 @@ class CellState(Enum):
     BEST_PATH = auto()  # Best path
     IGNORED = auto()  # Abandoned path
     BLANK = auto()
+    WALL = auto()
 
     START = auto()
     END = auto()
@@ -48,12 +49,6 @@ class GridPen(metaclass=ABCMeta):
         """Update the state of a cell (and repaint)"""
         pass
 
-
-    @abstractmethod
-    def update_wall(self, wall: Wall, active: bool) -> None:
-        """Update a wall (and repaint)"""
-        pass
-
     def reset_maze(self, maze: 'Maze'):
         """Repaint the whole grid, the maze may have different dimensions (resize window)"""
         self.__maze = maze
@@ -74,9 +69,6 @@ class GridPen(metaclass=ABCMeta):
                 pass
 
             def update_cell(self, cell: Cell, state: CellState) -> None:
-                pass
-
-            def update_wall(self, wall: Wall, active: bool) -> None:
                 pass
 
         return __NoopPen()
