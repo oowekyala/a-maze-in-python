@@ -24,7 +24,7 @@ class Maze(object):
 
     def apply_gen(self, gen: GenerationAlgo, pen: GridPen):
         self.reset()
-        pen.repaint_grid(maze=self)
+        pen.reset_maze(maze=self)
         gen.generate(maze=self, break_wall=lambda w: self.__break_wall(w, pen))
 
 
