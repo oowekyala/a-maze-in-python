@@ -166,6 +166,11 @@ class GenerationAlgo(metaclass=ABCMeta):
         pass
 
 
+    def _break_wall_between(self, break_wall_fun, c1, c2):
+        break_wall_fun(Cell(x=(c1.x + c2.x) // 2,
+                            y=(c1.y + c2.y) // 2))
+
+
 
 class PrimGenerate(GenerationAlgo):
 
@@ -250,21 +255,23 @@ class DfsGenerate(GenerationAlgo):
 
         while True:
             visited += cell
-            neighbors = maze.neighbors_list(cell, include_walls=True, blacklist=visited)
+            break_wall(cell)
+            neighbors = maze.neighbors_list(cell, include_walls=True, blacklist=visited, shift=2)
 
             if len(neighbors) == 0:
                 if len(stack) == 0:
                     break
-                (cell, neighbors) = stack.pop()
+                cell = stack.pop()
                 continue
 
             # choose a random wall to break, continue the visit there
             next_cell: Cell = random.choice(neighbors)
-            break_wall(next_cell)
+            self._break_wall_between(break_wall, cell, next_cell)
 
             neighbors.remove(next_cell)
             if len(neighbors) != 0:
-                stack.append((cell, neighbors))  # save state for later
+                pen.update_cells(neighbors, CellState.ACTIVE)
+                stack.append(cell)
 
             cell = next_cell
 
@@ -295,11 +302,8 @@ class WilsonGenerate(GenerationAlgo):
 
 
         # start with a random cell
-        starting_cell = Cell(x=random.randrange(0, maze.height, 2),
-                             y=random.randrange(0, maze.width, 2))
-        for c in [starting_cell, maze.start_cell, maze.end_cell]:
-            in_maze += c
-            break_wall(c)
+        in_maze += maze.start_cell
+        break_wall(maze.start_cell)
 
         while True:
             cur_cell: Cell = random_not_in_maze()
@@ -343,8 +347,7 @@ class WilsonGenerate(GenerationAlgo):
             # break walls separating items of the path
 
             for c1, c2 in zip(path, path[1:]):
-                break_wall(Cell(x=(c1.x + c2.x) // 2,
-                                y=(c1.y + c2.y) // 2))
+                self._break_wall_between(break_wall, c1, c2)
 
             pen.update_cells(path, lambda c: CellState.BLANK if c not in [maze.start_cell, maze.end_cell] else None)
 
