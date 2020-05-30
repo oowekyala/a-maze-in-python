@@ -5,9 +5,10 @@ from typing import Iterable, Union, Callable
 
 @unique
 class CellState(Enum):
-    ACTIVE = auto()  # Current path
-    BEST_PATH = auto()  # Best path
+    ACTIVE = auto()   # Current path
+    BEST_PATH = auto()# Best path
     IGNORED = auto()  # Abandoned path
+    DORMANT = auto()  # Grid of freeable cells
     BLANK = auto()
     WALL = auto()
 

@@ -26,22 +26,59 @@ class Maze(object):
         self.__nrows = nrows
         self.__ncols = ncols
 
-        self.start_cell = Cell(x=random.randrange(0, nrows, 2), y=random.randrange(0, ncols, 2))
-        self.end_cell = Cell(x=random.randrange(0, nrows, 2), y=random.randrange(0, ncols, 2))
+        self.start_cell = self.rand_cell()
+        self.end_cell = self.rand_cell()
 
         self.reset()
+
+
+    def rand_cell(self):
+        """Generate a random cell from the kernel set of this maze. (see is_kernel)"""
+        return Cell(x=random.randrange(0, self.height, 2),
+                    y=random.randrange(0, self.width, 2))
 
 
     def apply_gen(self, gen: 'GenerationAlgo', pen: GridPen):
         self.reset()
         pen.reset_maze(maze=self)
+
+        pen.update_cells(self.all_cells(),
+                         state=lambda c: CellState.DORMANT if self.is_kernel(c) else CellState.WALL,
+                         global_update=True)
+
+        pen.update_cell(self.start_cell, CellState.START)
+        pen.update_cell(self.end_cell, CellState.END)
+
         gen.generate(maze=self, pen=pen, break_wall=lambda w: self.__break_wall(w, pen))
 
 
+    @staticmethod
+    def is_kernel(cell: Cell):
+        """
+        The grid is divided into two shifted grids:
+            - cells with odd lines and odd cols may never be unwalled
+            - cells with even line and even col will always be unwalled eventually (they are the "kernel" cells)
+            - other cells are "edges" between the reachable cells (walls/passages), so they may or may not be unwalled
+
+        This function tests if the given cell belongs to the "kernel" set.
+
+        Note that to stay on the kernel grid, you must use neighbors_list with a step of 2. The start
+        cell and end cell must belong to the kernel.
+
+
+        Note that this is done to keep rendering and processing simple (wall cells are just cells),
+        while generating nice-looking mazes. But most graph-theoretic algorithms must be adapted to
+        stay on the kernel when visiting the grid.
+        """
+        return (cell.x & 1) == 0 and (cell.y & 1) == 0
+
+
     def __break_wall(self, cell: Cell, pen: GridPen):
+        time.sleep(0.001)
         self.set_wall(cell, False)
         if cell != self.start_cell and cell != self.end_cell:
             pen.update_cell(cell, CellState.BLANK)
+
 
     def reset(self):
         # 2 bitarrays: 1 for TOP walls, one for LEFT ones
@@ -157,16 +194,17 @@ class GenerationAlgo(metaclass=ABCMeta):
                  break_wall: Callable[[Cell], None]) -> None:
         """
         Generate the maze by breaking some walls. Initially all walls are
-        set.
+        set. To generate visually pleasing mazes, cells with both
 
         :param maze:            Receiver maze
         :param pen:             Pen to draw the generation (breaking a wall already updates the pen)
-        :param break_wall:      Function that breaks a wall
+        :param break_wall:      Function that turns a wall cell into a blank cell
         """
         pass
 
 
-    def _break_wall_between(self, break_wall_fun, c1, c2):
+    @staticmethod
+    def _break_wall_between(break_wall_fun, c1, c2):
         break_wall_fun(Cell(x=(c1.x + c2.x) // 2,
                             y=(c1.y + c2.y) // 2))
 
@@ -180,57 +218,36 @@ class PrimGenerate(GenerationAlgo):
                  break_wall: Callable[[Cell], None]) -> None:
 
         def neighbors(c: Cell):
-            return maze.neighbors_list(c, include_walls=True, include_diag=False)
+            return maze.neighbors_list(c, include_walls=True, shift=1)
 
-
-        def is_dormant(c: Cell):
-            return (c.x & 1) == 0 and (c.y & 1) == 0
-
-
-        def rand_cell():
-            # Those must end up on dormant cells (even x and y)
-            return Cell(x=random.randrange(0, maze.height, 2), y=random.randrange(0, maze.width, 2))
-
-        maze.start_cell = rand_cell()
-        maze.end_cell = rand_cell()
-
-        pen.update_cells(maze.all_cells(),
-                         state=lambda c: CellState.IGNORED if is_dormant(c) else CellState.WALL,
-                         global_update=True)
 
         break_wall(maze.start_cell)
 
         pen.update_cell(maze.start_cell, CellState.START)
         pen.update_cell(maze.end_cell, CellState.END)
 
-        walls = set([w for w in neighbors(maze.start_cell) if maze.is_wall(w) and not is_dormant(w)])
+        walls = set([w for w in neighbors(maze.start_cell)])
         pen.update_cells(walls, CellState.ACTIVE)
 
+        # While there are walls in the list:
+        # Pick a random wall from the list. If only one of the cells that the wall divides is visited, then:
+        # # Make the wall a passage and mark the unvisited cell as part of the maze.
+        # # Add the neighboring walls of the cell to the wall list.
+        # Remove the wall from the list.
         while len(walls) > 0:
             wall = random.choice(tuple(walls))
-            visited = 0
-            dormant_neighbors = set([])
+            free_neighbours = [n for n in neighbors(wall) if maze.is_free(n)]
             new_walls = []
 
-            ns = neighbors(wall)
-            for n in ns:
-
-                # Every dormant node eventually becomes a blank node, while the regular walls
-                # sometimes become a passage between blanks and are sometimes left as walls
-
-                if is_dormant(n) and maze.is_wall(n):
-                    dormant_neighbors.add(n)
-                elif maze.is_free(n):
-                    visited += 1
-
-            if visited <= 1:
+            if len(free_neighbours) == 1:
                 break_wall(wall)
 
-                if len(dormant_neighbors) > 0:
-                    cell = dormant_neighbors.pop()
-                    break_wall(cell)
+                free = free_neighbours.pop()
+                new_cell = free.mirror(around=wall)
+                if new_cell in maze:
+                    break_wall(new_cell)
 
-                    new_walls = [n for n in neighbors(cell) if maze.is_wall(n)]
+                    new_walls = [n for n in neighbors(new_cell) if maze.is_wall(n)]
             else:
                 pen.update_cell(wall, CellState.WALL)
 
@@ -239,8 +256,6 @@ class PrimGenerate(GenerationAlgo):
             pen.update_cells(new_walls, CellState.ACTIVE)
 
 
-
-# FIX US
 
 class DfsGenerate(GenerationAlgo):
 

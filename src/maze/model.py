@@ -37,6 +37,10 @@ class Cell(NamedTuple):
     y: int
 
 
+    def __hash__(self):
+        return self.x * 200_000 + self.y
+
+
     def next(self, side: Union[Side, Neighbour], shift: int = 1):
         (x, y) = self
 
@@ -52,6 +56,10 @@ class Cell(NamedTuple):
             x = x + shift
         return Cell(x, y)
 
+
+    def mirror(self, *, around: 'Cell'):
+        (dx, dy) = around.x - self.x, around.y - self.y
+        return Cell(around.x + dx, around.y + dy)
 
     @staticmethod
     def iterate(w: int, h: int, step=1):

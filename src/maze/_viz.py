@@ -22,6 +22,7 @@ class PyGamePen(GridPen):
     state_colors = {
         CellState.BLANK: CORRIDOR_COLOR,
         CellState.WALL: WALL_COLOR,
+        CellState.DORMANT: Color.GREY,
 
         CellState.IGNORED: Color.YELLOW,
         CellState.BEST_PATH: Color.BLUE,
