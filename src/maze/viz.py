@@ -54,7 +54,7 @@ class GridPen(metaclass=ABCMeta):
 
     def update_cells(self,
                      cells: Iterable[Cell],
-                     state: Union[CellState, Callable[[Cell], CellState]],
+                     state: Union[CellState, Callable[[Cell], Optional[CellState]]],
                      global_update: bool = False) -> None:
         """Batch update"""
         for c in cells:

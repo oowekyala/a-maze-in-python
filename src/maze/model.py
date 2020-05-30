@@ -2,6 +2,7 @@ import textwrap
 from enum import Enum, unique, auto
 from typing import NamedTuple, Optional, Union, Iterable
 from bitarray import bitarray
+from bitarray.util import rindex
 from copy import copy
 
 
@@ -36,25 +37,26 @@ class Cell(NamedTuple):
     y: int
 
 
-    def next(self, side: Union[Side, Neighbour]):
+    def next(self, side: Union[Side, Neighbour], shift: int = 1):
         (x, y) = self
 
         sides = tuple([side]) if isinstance(side, Side) else side.value
 
         if Side.LEFT in sides:
-            y = y - 1
+            y = y - shift
         if Side.RIGHT in sides:
-            y = y + 1
+            y = y + shift
         if Side.TOP in sides:
-            x = x - 1
+            x = x - shift
         if Side.BOT in sides:
-            x = x + 1
+            x = x + shift
         return Cell(x, y)
 
+
     @staticmethod
-    def iterate(w: int, h: int):
-        for x in range(0, h):
-            for y in range(0, w):
+    def iterate(w: int, h: int, step=1):
+        for x in range(0, h, step):
+            for y in range(0, w, step):
                 yield Cell(x, y)
 
     class CellSet(object):
@@ -116,6 +118,7 @@ class Cell(NamedTuple):
             self.__arr.invert()
             return self
 
+
         def __setitem__(self, key: 'Cell', value: bool):
             self.__arr[self.__position_of(key)] = value
 
@@ -124,16 +127,31 @@ class Cell(NamedTuple):
             self.__arr.setall(value)
 
 
+        def any_zero(self):
+            try:
+                i = rindex(self.__arr, False)
+                c = self.__rev_position_of(i)
+                return c
+            except ValueError:
+                return None
+
+
         def __ior__(self, other: 'Cell.CellSet'):
             self.__arr |= other.__arr
+            return self
 
 
         def __iand__(self, other: 'Cell.CellSet'):
             self.__arr &= other.__arr
+            return self
 
 
         def __position_of(self, cell: 'Cell'):
             return cell.x * self.width + cell.y
+
+
+        def __rev_position_of(self, idx: int) -> 'Cell':
+            return Cell(x=idx // self.width, y=idx % self.width)
 
 
         def __repr__(self):

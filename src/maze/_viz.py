@@ -59,14 +59,21 @@ class PyGamePen(GridPen):
         pygame.event.pump()
 
 
-    def update_cells(self, cells: Iterable[Cell], state: Union[CellState, Callable[[Cell], CellState]], global_update:bool=False) -> None:
+    def update_cells(self,
+                     cells: Iterable[Cell],
+                     state: Union[CellState, Callable[[Cell], Optional[CellState]]],
+                     global_update: bool = False) -> None:
         area_to_update: Optional[Rect] = None
         for cell in cells:
             if isinstance(state, CellState):
-                color = PyGamePen.state_colors[state].value
+                s = state
             else:
-                color = PyGamePen.state_colors[state(cell)].value
+                s = state(cell)
 
+            if not s:
+                continue
+
+            color = PyGamePen.state_colors[s].value
             rect = PyGamePen.cell_rect(cell)
             pygame.draw.rect(self.__screen, color, rect)
 
@@ -202,7 +209,7 @@ def loop(pen: GridPen):
 def launch():
     maze = Maze(nrows=100, ncols=100)
     pen = PyGamePen(maze)
-    maze.apply_gen(PrimGenerate(), pen=pen)
+    maze.apply_gen(WilsonGenerate(), pen=pen)
     print(maze)
     loop(pen)
 

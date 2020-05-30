@@ -26,8 +26,8 @@ class Maze(object):
         self.__nrows = nrows
         self.__ncols = ncols
 
-        self.start_cell = Cell(x=random.randint(a=0, b=nrows - 1), y=0)
-        self.end_cell = Cell(x=random.randint(a=0, b=nrows - 1), y=ncols - 1)
+        self.start_cell = Cell(x=random.randrange(0, nrows, 2), y=random.randrange(0, ncols, 2))
+        self.end_cell = Cell(x=random.randrange(0, nrows, 2), y=random.randrange(0, ncols, 2))
 
         self.reset()
 
@@ -61,13 +61,14 @@ class Maze(object):
     def neighbors_list(self,
                        cell: Cell,
                        *,
+                       shift: int = 1,
                        include_walls: bool = False,
                        include_diag: bool = False,
                        blacklist: Optional[Cell.CellSet] = None,
                        whitelist: Optional[Cell.CellSet] = None):
         return [c
                 for s in (list(Neighbour) if include_diag else list(Side))
-                for c in [cell.next(s)]
+                for c in [cell.next(s, shift=shift)]
                 if c in self
                 if include_walls or c in self.__free_cells
                 if (not blacklist or c not in blacklist)
@@ -110,8 +111,13 @@ class Maze(object):
     def __contains__(self, cell: Cell) -> bool:
         return 0 <= cell.x < self.height and 0 <= cell.y < self.width
 
+
     def all_cells(self):
         return Cell.iterate(h=self.height, w=self.width)
+
+
+    def all_even_cells(self):
+        return Cell.iterate(h=self.height, w=self.width, step=2)
 
 
     def __str__(self):
@@ -173,13 +179,12 @@ class PrimGenerate(GenerationAlgo):
 
 
         def is_dormant(c: Cell):
-            return (c.x & 1) == 1 and (c.y & 1) == 1
+            return (c.x & 1) == 0 and (c.y & 1) == 0
 
 
         def rand_cell():
-            # Those must end up on dormant cells (odd x and y)
-            return Cell(x=random.randrange(1, maze.height, 2), y=random.randrange(1, maze.width, 2))
-
+            # Those must end up on dormant cells (even x and y)
+            return Cell(x=random.randrange(0, maze.height, 2), y=random.randrange(0, maze.width, 2))
 
         maze.start_cell = rand_cell()
         maze.end_cell = rand_cell()
@@ -278,25 +283,37 @@ class WilsonGenerate(GenerationAlgo):
                  break_wall: Callable[[Cell], None]) -> None:
 
         in_maze: Cell.CellSet = maze.new_cell_set(False)
-        visited: Cell.CellSet = maze.new_cell_set(False)
         in_path: Cell.CellSet = maze.new_cell_set(False)
 
+
+        def random_not_in_maze():
+            # Linear brute force
+            try:
+                return next(c for c in maze.all_even_cells() if c not in in_maze)
+            except StopIteration:  # all cells are in the maze, we're done
+                return None
+
+
         # start with a random cell
-        in_maze += Cell(x=random.randint(a=0, b=maze.height),
-                        y=random.randint(a=0, b=maze.width))
+        starting_cell = Cell(x=random.randrange(0, maze.height, 2),
+                             y=random.randrange(0, maze.width, 2))
+        for c in [starting_cell, maze.start_cell, maze.end_cell]:
+            in_maze += c
+            break_wall(c)
 
         while True:
-            try:
-                cur_cell: Cell = next(c for c in maze.all_cells() if c not in in_maze and c not in visited)
-            except StopIteration:  # all cells are in the maze, we're done
+            cur_cell: Cell = random_not_in_maze()
+            if not cur_cell:  # all cells are in the maze, we're done
                 break
 
             in_path += cur_cell
-            path: List[Cell] = []
+            pen.update_cell(cur_cell, CellState.ACTIVE)
+            path: List[Cell] = [cur_cell]
 
             while cur_cell not in in_maze:  # loop-erased random walk until we find a maze cell
+                time.sleep(0.001)
 
-                available: List[Cell] = maze.neighbors_list(cur_cell, include_walls=True)
+                available: List[Cell] = maze.neighbors_list(cur_cell, include_walls=True, shift=2)
 
                 if len(available) == 0:
                     raise AssertionError("No reachable neighbour from %s" % cur_cell)
@@ -305,8 +322,11 @@ class WilsonGenerate(GenerationAlgo):
 
                 if next_cell in in_path:  # loop in the path
                     loop_start = path.index(next_cell)
-                    for c in path[loop_start + 1:]:
+                    loop_slice = path[loop_start + 1:]
+                    for c in loop_slice:
                         in_path -= c
+
+                    pen.update_cells(loop_slice, CellState.WALL)
 
                     cur_cell = path[loop_start]
 
@@ -315,12 +335,18 @@ class WilsonGenerate(GenerationAlgo):
                     in_path += next_cell
                     path.append(next_cell)
 
+                    pen.update_cell(next_cell, CellState.ACTIVE)
+
                     cur_cell = next_cell
 
-            # lastly add the whole path to the maze
+            # lastly add the whole path to the maze, meaning
+            # break walls separating items of the path
 
-            for c in path:
-                break_wall(c)
+            for c1, c2 in zip(path, path[1:]):
+                break_wall(Cell(x=(c1.x + c2.x) // 2,
+                                y=(c1.y + c2.y) // 2))
+
+            pen.update_cells(path, lambda c: CellState.BLANK if c not in [maze.start_cell, maze.end_cell] else None)
 
             in_maze |= in_path
             in_path.setall(False)
