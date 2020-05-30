@@ -10,7 +10,7 @@ from maze.model import *
 
 
 class PyGamePen(GridPen):
-    CELL_WIDTH = 20
+    CELL_WIDTH = 8
     CELL_HEIGHT = CELL_WIDTH
     # Margin separating each cell
     MARGIN = 0
@@ -57,6 +57,31 @@ class PyGamePen(GridPen):
         pygame.draw.rect(self.__screen, color, rect)
         pygame.display.update(rect)
         pygame.event.pump()
+
+
+    def update_cells(self, cells: Iterable[Cell], state: Union[CellState, Callable[[Cell], CellState]], global_update:bool=False) -> None:
+        area_to_update: Optional[Rect] = None
+        for cell in cells:
+            if isinstance(state, CellState):
+                color = PyGamePen.state_colors[state].value
+            else:
+                color = PyGamePen.state_colors[state(cell)].value
+
+            rect = PyGamePen.cell_rect(cell)
+            pygame.draw.rect(self.__screen, color, rect)
+
+            if not global_update:
+                if area_to_update:
+                    area_to_update = area_to_update.union(rect)
+                else:
+                    area_to_update = rect
+
+        if area_to_update:
+            pygame.display.update(area_to_update)
+            pygame.event.pump()
+        elif global_update:
+            pygame.display.flip()
+            pygame.event.pump()
 
 
     def paint_everything(self):

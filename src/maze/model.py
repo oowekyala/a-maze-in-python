@@ -5,6 +5,29 @@ from bitarray import bitarray
 from copy import copy
 
 
+
+@unique
+class Side(Enum):
+    LEFT = auto()
+    TOP = auto()
+    RIGHT = auto()
+    BOT = auto()
+
+
+
+@unique
+class Neighbour(Enum):
+    LL = (Side.LEFT, Side.LEFT)
+    UL = (Side.TOP, Side.LEFT)
+    UU = (Side.TOP, Side.TOP)
+    UR = (Side.TOP, Side.RIGHT)
+    RR = (Side.RIGHT, Side.RIGHT)
+    DR = (Side.BOT, Side.RIGHT)
+    DD = (Side.BOT, Side.BOT)
+    DL = (Side.BOT, Side.LEFT)
+
+
+
 class Cell(NamedTuple):
     """
     A cell position in a maze. Mazes are row-major: x is the row, y is the column.
@@ -13,15 +36,18 @@ class Cell(NamedTuple):
     y: int
 
 
-    def next(self, side):
+    def next(self, side: Union[Side, Neighbour]):
         (x, y) = self
-        if side is Side.LEFT:
+
+        sides = tuple([side]) if isinstance(side, Side) else side.value
+
+        if Side.LEFT in sides:
             y = y - 1
-        elif side is Side.RIGHT:
+        if Side.RIGHT in sides:
             y = y + 1
-        elif side is Side.TOP:
+        if Side.TOP in sides:
             x = x - 1
-        elif side is Side.BOT:
+        if Side.BOT in sides:
             x = x + 1
         return Cell(x, y)
 
@@ -112,22 +138,3 @@ class Cell(NamedTuple):
 
         def __repr__(self):
             return '\n'.join(textwrap.wrap(self.__arr.to01(), width=self.width))
-
-
-class Direction(Enum):
-    HORIZONTAL = auto()
-    VERTICAL = auto()
-
-
-
-@unique
-class Side(Enum):
-    LEFT = auto()
-    TOP = auto()
-    RIGHT = auto()
-    BOT = auto()
-
-
-    def direction(self):
-        is_horiz = self is Side.LEFT or self is Side.RIGHT
-        return Direction.HORIZONTAL if is_horiz else Direction.VERTICAL

@@ -1,6 +1,7 @@
 from maze.model import *
 from abc import abstractmethod, ABCMeta
 from enum import Enum, auto, unique
+from typing import Iterable, Union, Callable
 
 @unique
 class CellState(Enum):
@@ -44,14 +45,29 @@ class GridPen(metaclass=ABCMeta):
     def maze(self):
         return self.__maze
 
+
     @abstractmethod
     def update_cell(self, cell: Cell, state: CellState) -> None:
         """Update the state of a cell (and repaint)"""
         pass
 
+
+    def update_cells(self,
+                     cells: Iterable[Cell],
+                     state: Union[CellState, Callable[[Cell], CellState]],
+                     global_update: bool = False) -> None:
+        """Batch update"""
+        for c in cells:
+            if isinstance(state, CellState):
+                self.update_cell(c, state)
+            else:
+                self.update_cell(c, state(c))
+
+
     def reset_maze(self, maze: 'Maze'):
         """Repaint the whole grid, the maze may have different dimensions (resize window)"""
         self.__maze = maze
+
 
     @abstractmethod
     def paint_everything(self):
@@ -67,6 +83,7 @@ class GridPen(metaclass=ABCMeta):
 
             def paint_everything(self):
                 pass
+
 
             def update_cell(self, cell: Cell, state: CellState) -> None:
                 pass
