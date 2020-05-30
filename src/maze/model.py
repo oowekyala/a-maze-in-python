@@ -41,7 +41,11 @@ class Cell(NamedTuple):
         return self.x * 200_000 + self.y
 
 
-    def next(self, side: Union[Side, Neighbour], shift: int = 1):
+    def wall(self, side: Side) -> 'Wall':
+        return Wall(self, side=side)
+
+
+    def next(self, side: Union[Side, Neighbour], shift: int = 1) -> 'Cell':
         (x, y) = self
 
         sides = tuple([side]) if isinstance(side, Side) else side.value
@@ -62,8 +66,14 @@ class Cell(NamedTuple):
         return Cell(around.x + dx, around.y + dy)
 
     @staticmethod
-    def iterate(w: int, h: int, step=1):
-        for x in range(0, h, step):
+    def iterate(from_cell=None, *, w: int, h: int, step=1):
+        if not from_cell:
+            from_cell = Cell(0, 0)
+
+        for y in range(from_cell.y, w, step):
+            yield Cell(from_cell.x, y)
+
+        for x in range(from_cell.x + 1, h, step):
             for y in range(0, w, step):
                 yield Cell(x, y)
 
@@ -164,3 +174,22 @@ class Cell(NamedTuple):
 
         def __repr__(self):
             return '\n'.join(textwrap.wrap(self.__arr.to01(), width=self.width))
+
+
+
+class Wall(NamedTuple):
+    """ Wall of a cell. """
+    cell: Cell
+    side: Side
+
+    @property
+    def next_cell(self):
+        return self.cell.next(side=self.side)
+
+    @property
+    def x(self):
+        return self.cell.x
+
+    @property
+    def y(self):
+        return self.cell.y

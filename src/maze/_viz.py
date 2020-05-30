@@ -22,11 +22,17 @@ class PyGamePen(GridPen):
     state_colors = {
         CellState.BLANK: CORRIDOR_COLOR,
         CellState.WALL: WALL_COLOR,
+
+        WallState.ON: WALL_COLOR,
+        WallState.OFF: CORRIDOR_COLOR,
+
         CellState.DORMANT: Color.GREY,
 
         CellState.IGNORED: Color.YELLOW,
         CellState.BEST_PATH: Color.BLUE,
+
         CellState.ACTIVE: Color.GREEN,
+        WallState.ACTIVE: Color.GREEN,
 
         CellState.START: Color.RED,
         CellState.END: Color.RED,
@@ -42,22 +48,49 @@ class PyGamePen(GridPen):
 
 
     @staticmethod
-    def cell_rect(cell: Cell) -> pygame.Rect:
+    def _cell_rect(cell: Cell) -> pygame.Rect:
+        return PyGamePen.__rect(2 * cell.x + 1, 2 * cell.y + 1)
+
+
+    @staticmethod
+    def _wall_rect(wall: Wall) -> pygame.Rect:
+        ((x, y), side) = wall
+        (x, y) = (2 * x + 1, 2 * y + 1)
+        if side == Side.TOP:
+            x -= 1
+        elif side == Side.BOT:
+            x += 1
+        elif side == Side.LEFT:
+            y -= 1
+        elif side == Side.RIGHT:
+            y += 1
+
+        return PyGamePen.__rect(x, y)
+
+
+    @staticmethod
+    def __rect(x, y) -> pygame.Rect:
         return Rect(
-            (PyGamePen.MARGIN + PyGamePen.CELL_WIDTH) * cell.y + PyGamePen.MARGIN,
-            (PyGamePen.MARGIN + PyGamePen.CELL_HEIGHT) * cell.x + PyGamePen.MARGIN,
+            (PyGamePen.MARGIN + PyGamePen.CELL_WIDTH) * y + PyGamePen.MARGIN,
+            (PyGamePen.MARGIN + PyGamePen.CELL_HEIGHT) * x + PyGamePen.MARGIN,
             PyGamePen.CELL_WIDTH,
             PyGamePen.CELL_HEIGHT
         )
 
 
     def update_cell(self, cell: Cell, state: CellState) -> None:
-        rect = PyGamePen.cell_rect(cell)
+        self.__single_update(rect=PyGamePen._cell_rect(cell), state=state)
+
+    def __single_update(self, rect: pygame.Rect, state: Union[CellState, WallState]):
         color = PyGamePen.state_colors[state].value
 
         pygame.draw.rect(self.__screen, color, rect)
         pygame.display.update(rect)
         pygame.event.pump()
+
+
+    def update_wall(self, wall: Wall, state: WallState) -> None:
+        self.__single_update(rect=PyGamePen._wall_rect(wall), state=state)
 
 
     def update_cells(self,
@@ -75,7 +108,7 @@ class PyGamePen(GridPen):
                 continue
 
             color = PyGamePen.state_colors[s].value
-            rect = PyGamePen.cell_rect(cell)
+            rect = PyGamePen._cell_rect(cell)
             pygame.draw.rect(self.__screen, color, rect)
 
             if not global_update:
@@ -107,7 +140,7 @@ class PyGamePen(GridPen):
 
 
     def __draw_entire_maze(self, maze: Maze):
-        self.__screen.fill(PyGamePen.CORRIDOR_COLOR.value)
+        self.__screen.fill(PyGamePen.WALL_COLOR.value)
         maze.draw_regular_tiles(self)
         self.update_cell(maze.start_cell, CellState.START)
         self.update_cell(maze.end_cell, CellState.END)
@@ -117,17 +150,16 @@ class PyGamePen(GridPen):
     def __size_window(maze: Maze) -> pygame.Surface:
         # Set the width and height of the screen [width, height]
 
-        screen_width = PyGamePen.__grid_size(maze.width)
-        grid_height = PyGamePen.__grid_size(maze.height)
-        screen_height = grid_height + PyGamePen.BUTTON_HEIGHT * 3
+        screen_width = PyGamePen.__grid_size(maze.width, PyGamePen.CELL_WIDTH)
+        screen_height = PyGamePen.__grid_size(maze.height, PyGamePen.CELL_HEIGHT)
         window_size = (screen_width, screen_height)
 
         return pygame.display.set_mode(window_size)
 
 
     @staticmethod
-    def __grid_size(dim: int):
-        return dim * (PyGamePen.CELL_WIDTH + PyGamePen.MARGIN) + PyGamePen.MARGIN * 2
+    def __grid_size(dim: int, inc: int):
+        return (2*dim+1) * (inc + PyGamePen.MARGIN) + PyGamePen.MARGIN * 2
 
 
 def get_mouse_cell():
@@ -208,7 +240,7 @@ def loop(pen: GridPen):
 
 
 def launch():
-    maze = Maze(nrows=100, ncols=100)
+    maze = Maze(nrows=50, ncols=100)
     pen = PyGamePen(maze)
     maze.apply_gen(WilsonGenerate(), pen=pen)
     print(maze)

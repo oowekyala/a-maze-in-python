@@ -5,8 +5,8 @@ from typing import Iterable, Union, Callable
 
 @unique
 class CellState(Enum):
-    ACTIVE = auto()   # Current path
-    BEST_PATH = auto()# Best path
+    ACTIVE = auto()  # Current path
+    BEST_PATH = auto()  # Best path
     IGNORED = auto()  # Abandoned path
     DORMANT = auto()  # Grid of freeable cells
     BLANK = auto()
@@ -14,6 +14,13 @@ class CellState(Enum):
 
     START = auto()
     END = auto()
+
+
+
+class WallState(Enum):
+    ACTIVE = auto()
+    OFF = auto()
+    ON = auto()
 
 
 
@@ -53,6 +60,15 @@ class GridPen(metaclass=ABCMeta):
         pass
 
 
+    def update_wall(self, wall: Wall, state: WallState) -> None:
+        pass
+
+
+    def update_walls(self, walls: Iterable[Wall], state: WallState) -> None:
+        for wall in walls:
+            self.update_wall(wall, state)
+
+
     def update_cells(self,
                      cells: Iterable[Cell],
                      state: Union[CellState, Callable[[Cell], Optional[CellState]]],
@@ -86,7 +102,7 @@ class GridPen(metaclass=ABCMeta):
                 pass
 
 
-            def update_cell(self, cell: Cell, state: CellState) -> None:
+            def update_cell(self, cell, state):
                 pass
 
         return __NoopPen()
