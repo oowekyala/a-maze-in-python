@@ -242,7 +242,7 @@ def launch():
     pen = PyGamePen(maze)
     maze.apply_gen(PrimGenerate(), pen=pen)
     time.sleep(2)
-    DfsSolver().solve(maze, pen)
+    HandRuleSolver(is_right_hand_rule=False).solve(maze, pen)
     print(maze)
     loop(pen)
 
