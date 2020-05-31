@@ -9,7 +9,6 @@ from maze.solver import *
 from maze.model import *
 
 
-
 class PyGamePen(GridPen):
     CELL_WIDTH = 8
     CELL_HEIGHT = CELL_WIDTH
@@ -32,12 +31,8 @@ class PyGamePen(GridPen):
         CellKind.END: {s: Color.ORANGE for s in list(CellState)},
     }
 
-    wall_colors = {
-        WallState.ON: WALL_COLOR,
-        WallState.OFF: CORRIDOR_COLOR,
-        WallState.ACTIVE: Color.GREEN,
-    }
-
+    cell_colors[CellKind.WALL_OFF] = {**cell_colors[CellKind.REGULAR], CellState.UNDISCOVERED: WALL_COLOR}
+    cell_colors[CellKind.WALL_ON] = {**cell_colors[CellKind.WALL_OFF], CellState.NORMAL: WALL_COLOR}
 
     def __init__(self, maze: Maze):
         super().__init__(maze)
@@ -78,39 +73,59 @@ class PyGamePen(GridPen):
             PyGamePen.CELL_HEIGHT
         )
 
-
-    def update_cell(self, cell: Cell, state: CellStateSelector) -> None:
-        kind = self.get_kind(cell)
-        state = self._state_selector(state)(cell)
-        self.__single_update(rect=PyGamePen._cell_rect(cell), color=PyGamePen.cell_colors[kind][state])
-
-
     def __single_update(self, rect: pygame.Rect, color: Color):
         pygame.draw.rect(self.__screen, color.value, rect)
         pygame.display.update(rect)
         pygame.event.pump()
 
 
-    def update_wall(self, wall: Wall, state: WallStateSelector) -> None:
-        wall_state = self._state_selector(state)(wall)
-        self.__single_update(rect=PyGamePen._wall_rect(wall), color=PyGamePen.wall_colors[wall_state])
-
-
-    def update_cells(self,
-                     cells: Iterable[Cell],
-                     state: CellStateSelector,
+    def update_walls(self,
+                     *walls: Wall,
+                     state: CellState = CellState.NORMAL,
                      global_update: bool = False) -> None:
+
+        def get_color(wall: Wall):
+            kind = CellKind.WALL_ON if self.maze.has_wall(wall) else CellKind.WALL_OFF
+            return PyGamePen.cell_colors[kind][state]
+
+
+        if len(walls) == 1:
+            self.__single_update(rect=PyGamePen._wall_rect(walls[0]), color=get_color(walls[0]))
+        else:
+            self._batched_update(walls, get_color, get_rect=PyGamePen._wall_rect)
+
+
+    def update_cells(self, *cells: Cell, state: CellStateSelector, global_update: bool = False) -> None:
+
+        sel = state_selector(state)
+
+        def get_color(cell: Cell):
+            s = sel(cell)
+            return PyGamePen.cell_colors[self.get_kind(cell)][s] if s else None
+
+        if len(cells) == 1:
+            self.__single_update(rect=PyGamePen._cell_rect(cells[0]), color=get_color(cells[0]))
+        else:
+            self._batched_update(cells, get_color, get_rect=PyGamePen._cell_rect)
+
+
+    T = TypeVar('T')
+
+
+    def _batched_update(self,
+                        cells: Iterable[T],
+                        get_color: Callable[[T], Optional[Color]],
+                        get_rect: Callable[[T], Rect],
+                        global_update: bool = False):
         area_to_update: Optional[Rect] = None
-        sel = self._state_selector(state)
 
         for cell in cells:
-            s = sel(cell)
-            if not s:
+            color = get_color(cell)
+            if not color:
                 continue
 
-            color = PyGamePen.cell_colors[self.get_kind(cell)][s].value
-            rect = PyGamePen._cell_rect(cell)
-            pygame.draw.rect(self.__screen, color, rect)
+            rect = get_rect(cell)
+            pygame.draw.rect(self.__screen, color.value, rect)
 
             if not global_update:
                 if area_to_update:
@@ -170,7 +185,6 @@ def get_mouse_cell():
     column = pos[0] // (PyGamePen.CELL_WIDTH + PyGamePen.MARGIN)
     row = pos[1] // (PyGamePen.CELL_HEIGHT + PyGamePen.MARGIN)
     return Cell(x=(row - 1) // 2, y=(column - 1) // 2)
-
 
 
 # -------- Main Program Loop -----------

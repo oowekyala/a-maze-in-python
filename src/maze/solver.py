@@ -29,35 +29,32 @@ class DfsSolver(SolverAlgo):
         stack = []
         cell = maze.start_cell
 
-        while cell != maze.end_cell:
-            time.sleep(0.5)
-            visited += cell
-            pen.update_cell(cell, CellState.BEST_PATH)
+        pen.update_cells(cell, state=CellState.BEST_PATH)
 
-            walls: List[Wall] = maze.walls_around(cell, blacklist=visited)
+        while cell != maze.end_cell:
+            time.sleep(0.02)
+            visited += cell
+
+            walls: List[Wall] = maze.walls_around(cell, only_passages=True, blacklist=visited)
 
             if len(walls) == 0:
-                pen.update_cell(cell, CellState.IGNORED)
+                # prev_wall.next_cell == cell on first iteration
                 while len(stack) > 0 and len(walls) == 0:
-                    (cell, walls_p) = stack.pop()
-                    if len(walls_p) == 0:
-                        pen.update_cell(cell, CellState.IGNORED)
+                    (prev_wall, others) = stack.pop()
+                    pen.paint_wall_path(prev_wall, state=CellState.IGNORED)
+
+                    walls = [w for w in others if w.next_cell not in visited]
+
+                    if len(walls) == 0:
+                        pen.update_walls(*others, state=CellState.IGNORED)
                         continue
 
-                    walls = []
-                    for w in walls_p:
-                        if w.next_cell not in visited:
-                            walls.append(w)
-
-                if len(walls) == 0:
-                    break
+                assert len(walls) > 0, "Unreachable end cell"
 
             # choose a random passage
-            next_wall: Wall = next(w for w in walls if not maze.has_wall(w))
-
-            walls.remove(next_wall)
-
-            pen.update_cells([w.next_cell for w in walls], CellState.ACTIVE)
-            stack.append((cell, walls))
-
+            next_wall: Wall = walls.pop()
+            stack.append((next_wall, walls))
             cell = next_wall.next_cell
+
+            pen.paint_wall_path(next_wall, state=CellState.BEST_PATH)
+            pen.paint_wall_path(*walls, state=CellState.ACTIVE)

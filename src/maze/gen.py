@@ -42,32 +42,33 @@ class Maze(object):
         self.reset()
         pen.reset_maze(maze=self)
 
-        pen.update_cells(self.all_cells(), state=CellState.UNDISCOVERED, global_update=True)
+        pen.update_cells(*self.all_cells(), state=CellState.UNDISCOVERED, global_update=True)
 
         gen.generate(maze=self, seed=self.start_cell, pen=pen)
 
 
     def break_wall(self, wall: Wall, pen: GridPen):
-        self.set_wall(wall, False)
-        pen.update_wall(wall, WallState.OFF)
+        self.set_wall(wall, is_present=False)
+        pen.update_walls(wall)
 
 
     def reset(self):
         # 2 bitarrays: 1 for TOP walls, one for LEFT ones
         # All walls are set
         self.__walls = {
-            Side.TOP: self.new_cell_set(),
-            Side.LEFT: self.new_cell_set(),
+            Side.TOP: self.new_cell_set(initial_value=True),
+            Side.LEFT: self.new_cell_set(initial_value=True),
         }
 
     def new_cell_set(self, initial_value: bool = False) -> Cell.CellSet:
         return Cell.CellSet.with_initial(height=self.height, width=self.width, initial_value=initial_value)
 
-    def walls_around(self, cell: Cell, *, blacklist=None):
+    def walls_around(self, cell: Cell, *, only_passages=False, blacklist=None):
         return [w
                 for s in list(Side)
                 for w in [cell.wall(s)]
                 if w.next_cell in self
+                if (not only_passages) or (not self.has_wall(w))
                 if (not blacklist or w.next_cell not in blacklist)]
 
 
@@ -154,16 +155,16 @@ class Maze(object):
         for cell in self.all_cells():
 
             if cell in self.__walls[Side.TOP]:
-                pen.update_wall(cell.wall(Side.TOP), WallState.ON)
+                pen.update_walls(cell.wall(Side.TOP))
 
             if cell in self.__walls[Side.LEFT]:
-                pen.update_wall(cell.wall(Side.LEFT), WallState.ON)
+                pen.update_walls(cell.wall(Side.LEFT))
 
             if cell.x == self.height - 1:
-                pen.update_wall(cell.wall(Side.BOT), WallState.ON)
+                pen.update_walls(cell.wall(Side.BOT))
 
             if cell.y == self.width - 1:
-                pen.update_wall(cell.wall(Side.RIGHT), WallState.ON)
+                pen.update_walls(cell.wall(Side.RIGHT))
 
 
 
@@ -200,7 +201,7 @@ class PrimGenerate(GenerationAlgo):
 
 
         walls = set(walls_around(seed))
-        pen.update_walls(walls, WallState.ACTIVE)
+        pen.update_walls(*walls, state=CellState.ACTIVE)
 
         visited += maze.start_cell
 
@@ -220,12 +221,14 @@ class PrimGenerate(GenerationAlgo):
                 # assert wall.next_cell in maze  # if it was added to the set of walls, then it is in the maze
 
                 visited += wall.next_cell
-                pen.update_cell(wall.next_cell, CellState.NORMAL)
+
                 new_walls = walls_around(wall.next_cell)
                 walls.update(new_walls)
-                pen.update_walls(new_walls, WallState.ACTIVE)
+
+                pen.update_cells(wall.next_cell, state=CellState.NORMAL)
+                pen.update_walls(*new_walls, state=CellState.ACTIVE)
             else:
-                pen.update_wall(wall, WallState.ON)  # Remove ACTIVE status
+                pen.update_walls(wall)  # Remove ACTIVE status
 
 
 
@@ -242,7 +245,7 @@ class DfsGenerate(GenerationAlgo):
 
         while True:
             visited += cell
-            pen.update_cell(cell, CellState.NORMAL)
+            pen.update_cells(cell, state=CellState.NORMAL)
 
             walls: List[Wall] = maze.walls_around(cell, blacklist=visited)
 
@@ -252,7 +255,7 @@ class DfsGenerate(GenerationAlgo):
                     walls = []
                     for w in walls_p:
                         if w.next_cell in visited:
-                            pen.update_wall(w, WallState.ON)
+                            pen.update_walls(w)
                         else:
                             walls.append(w)
 
@@ -266,7 +269,7 @@ class DfsGenerate(GenerationAlgo):
 
             walls.remove(next_wall)
             if len(walls) != 0:
-                pen.update_walls(walls, WallState.ACTIVE)
+                pen.update_walls(*walls, state=CellState.ACTIVE)
                 stack.append((cell, walls))
 
             cell = next_wall.next_cell
@@ -309,7 +312,7 @@ class WilsonGenerate(GenerationAlgo):
                 break
 
             in_path += cur_cell
-            pen.update_cell(cur_cell, CellState.ACTIVE)
+            pen.update_cells(cur_cell, state=CellState.ACTIVE)
             path_start = cur_cell
             path: List[Wall] = []
 
@@ -333,10 +336,7 @@ class WilsonGenerate(GenerationAlgo):
                     for wall in path[loop_start + 1:]:
                         nc = wall.next_cell
                         in_path -= nc
-                        if nc == maze.end_cell:
-                            pen.update_cell(wall.next_cell, CellState.UNDISCOVERED)
-                        else:
-                            pen.update_cell(wall.next_cell, CellState.UNDISCOVERED)
+                        pen.update_cells(wall.next_cell, state=CellState.UNDISCOVERED)
 
                     cur_cell = path_start if loop_start < 0 else path[loop_start].next_cell
 
@@ -345,7 +345,7 @@ class WilsonGenerate(GenerationAlgo):
                     in_path += next_cell
                     path.append(next_wall)
 
-                    pen.update_cell(next_cell, CellState.ACTIVE)
+                    pen.update_cells(next_cell, state=CellState.ACTIVE)
 
                     cur_cell = next_cell
 
@@ -353,10 +353,10 @@ class WilsonGenerate(GenerationAlgo):
             # break walls separating items of the path
 
             for wall in path:
-                pen.update_cell(wall.cell, CellState.NORMAL)
+                pen.update_cells(wall.cell, state=CellState.NORMAL)
                 maze.break_wall(wall, pen)
 
-            pen.update_cell(cur_cell, CellState.NORMAL)
+            pen.update_cells(cur_cell, state=CellState.NORMAL)
 
             in_maze |= in_path
             in_path.setall(False)

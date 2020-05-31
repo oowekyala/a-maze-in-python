@@ -1,7 +1,8 @@
-from maze.model import *
 from abc import abstractmethod, ABCMeta
+from typing import Callable, Dict, TypeVar
 from enum import Enum, auto, unique
-from typing import Iterable, Union, Callable, Dict
+
+from maze.model import *
 
 
 
@@ -17,14 +18,14 @@ class CellState(Enum):
 
 @unique
 class CellKind(Enum):
+    """The kind of a cell select the color palette for its states."""
+
     REGULAR = auto()
     START = auto()
     END = auto()
-
-class WallState(Enum):
-    ACTIVE = auto()
-    OFF = auto()
-    ON = auto()
+    # Wall kinds are internal and cannot be used for Cell
+    WALL_ON = auto()
+    WALL_OFF = auto()
 
 @unique
 class Color(Enum):
@@ -45,14 +46,21 @@ class Color(Enum):
 
 
 
-def StateSelector(i, o):
-    return Union[o, Callable[[i], Optional[o]], Dict[i, o]]
+C = TypeVar('C', Cell, Wall)
+StateSelector = Union[CellState, Callable[[C], Optional[CellState]], Dict[C, (CellState)]]
+
+CellStateSelector = StateSelector[Cell]
+WallStateSelector = StateSelector[Wall]
 
 
 
-CellStateSelector = StateSelector(Cell, CellState)
-WallStateSelector = StateSelector(Wall, WallState)
-
+def state_selector(state: StateSelector[C]) -> Callable[[C], Optional[CellState]]:
+    if isinstance(state, dict):
+        return lambda c: state.get(c, None)
+    elif isinstance(state, Callable):
+        return state
+    else:
+        return lambda c: state
 
 
 class GridPen(metaclass=ABCMeta):
@@ -67,27 +75,22 @@ class GridPen(metaclass=ABCMeta):
     def maze(self):
         return self.__maze
 
-
-    @abstractmethod
-    def update_cell(self, cell: Cell, state: CellStateSelector) -> None:
-        """Update the state of a cell (and repaint)"""
+    def update_walls(self,
+                     *walls: Wall,
+                     state: CellState = CellState.NORMAL,
+                     global_update: bool = False) -> None:
         pass
 
 
-    def update_wall(self, wall: Wall, state: WallStateSelector) -> None:
-        pass
-
-
-    def update_walls(self, walls: Iterable[Wall], state: WallStateSelector) -> None:
+    def paint_wall_path(self, *walls: Wall, state: CellState):
         for wall in walls:
-            self.update_wall(wall, state)
+            self.update_cells(wall.next_cell, state=state)
+            self.update_walls(wall, state=state)
 
 
-    def update_cells(self, cells: Iterable[Cell], state: CellStateSelector, global_update: bool = False) -> None:
+    def update_cells(self, *cells: Cell, state: CellStateSelector, global_update: bool = False) -> None:
         """Batch update"""
-        sel = self._state_selector(state)
-        for c in cells:
-            self.update_cell(c, sel(c))
+        pass
 
 
     def move_start_or_end(self, new_pos: Cell, kind: CellKind):
@@ -106,7 +109,7 @@ class GridPen(metaclass=ABCMeta):
 
         self.__reset_kind_map()
 
-        self.update_cells([old, new_pos], state=CellState.NORMAL)
+        self.update_cells(old, new_pos, state=CellState.NORMAL)
 
 
     def get_kind(self, cell: Cell):
@@ -128,15 +131,6 @@ class GridPen(metaclass=ABCMeta):
         }
 
 
-    def _state_selector(self, state):
-        if isinstance(state, dict):
-            return lambda c: state.get(c, None)
-        elif isinstance(state, Callable):
-            return state
-        else:
-            return lambda c: state
-
-
     @abstractmethod
     def paint_everything(self):
         """"""
@@ -151,19 +145,16 @@ class GridPen(metaclass=ABCMeta):
                 super().__init__(maze)
 
 
-            def paint_everything(self):
+            def paint_everything(self, *args, **kwargs):
                 pass
 
 
-            def update_cells(self, cells, state, global_update: bool = False) -> None:
+            def update_cells(self, *args, **kwargs) -> None:
                 pass
 
 
-            def update_walls(self, walls, state) -> None:
+            def update_walls(self, *args, **kwargs) -> None:
                 pass
 
-
-            def update_cell(self, cell, state):
-                pass
 
         return __NoopPen()
