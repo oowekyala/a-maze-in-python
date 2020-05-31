@@ -8,6 +8,7 @@ from maze.gen import *
 from maze.model import *
 
 
+
 class PyGamePen(GridPen):
     CELL_WIDTH = 8
     CELL_HEIGHT = CELL_WIDTH
@@ -77,12 +78,9 @@ class PyGamePen(GridPen):
         )
 
 
-    def get_kind(self, cell: Cell):
-        return self.__cell_kind_map.get(cell, CellKind.REGULAR)
-
     def update_cell(self, cell: Cell, state: CellStateSelector) -> None:
         kind = self.get_kind(cell)
-        state=self._state_selector(state)(cell)
+        state = self._state_selector(state)(cell)
         self.__single_update(rect=PyGamePen._cell_rect(cell), color=PyGamePen.cell_colors[kind][state])
 
 
@@ -134,14 +132,9 @@ class PyGamePen(GridPen):
 
     def reset_maze(self, maze: Maze):
         prev_maze = self.maze
-        super().reset_maze(maze)
+        super().reset_maze(maze)  # self.maze = maze
         if prev_maze is not maze:
             self.__screen = PyGamePen.__size_window(maze)
-
-        self.__cell_kind_map = {
-            maze.end_cell: CellKind.END,
-            maze.start_cell: CellKind.START
-        }
 
         self.__draw_entire_maze(maze)
 
@@ -164,7 +157,8 @@ class PyGamePen(GridPen):
 
     @staticmethod
     def __grid_size(dim: int, inc: int):
-        return (2*dim+1) * (inc + PyGamePen.MARGIN) + PyGamePen.MARGIN * 2
+        return (2 * dim + 1) * (inc + PyGamePen.MARGIN) + PyGamePen.MARGIN * 2
+
 
 
 def get_mouse_cell():
@@ -174,13 +168,14 @@ def get_mouse_cell():
     # Change the x/y screen coordinates to grid coordinates
     column = pos[0] // (PyGamePen.CELL_WIDTH + PyGamePen.MARGIN)
     row = pos[1] // (PyGamePen.CELL_HEIGHT + PyGamePen.MARGIN)
-    return Cell(x=column, y=row)
+    return Cell(x=(row - 1) // 2, y=(column - 1) // 2)
+
 
 
 # -------- Main Program Loop -----------
 def loop(pen: GridPen):
     maze = pen.maze
-    drag_start_point = drag_end_point = False
+    dragged_kind = None
     algo_was_run = False
 
     while True:
@@ -193,15 +188,11 @@ def loop(pen: GridPen):
                 clicked: Cell = get_mouse_cell()
                 # If click is inside grid
                 if clicked in maze and not algo_was_run:
-                    if clicked == maze.start_cell:
-                        drag_start_point = True
-                    elif clicked == maze.end_cell:
-                        drag_end_point = True
-
+                    dragged_kind = pen.get_kind(clicked)
 
             elif event.type == pygame.MOUSEBUTTONUP:
                 # Turn off all mouse drags if mouse Button released
-                drag_end_point = drag_start_point = False
+                dragged_kind = None
 
             elif event.type == pygame.MOUSEMOTION:
 
@@ -211,31 +202,18 @@ def loop(pen: GridPen):
                 # Sometimes we get stuck in this loop if the mousebutton is released while not in the pygame screen
                 # This acts to break out of that loop
                 if not left:
-                    drag_end_point = drag_start_point = False
+                    dragged_kind = None
                     continue
 
                 mouse_cell: Cell = get_mouse_cell()
 
                 # Turn mouse_drag off if mouse goes outside of grid
                 if mouse_cell not in maze:
-                    drag_end_point = drag_start_point = False
+                    dragged_kind = None
                     continue
 
-                # Move the start point
-                if drag_start_point:
-                    pen.update_cell(maze.start_cell, CellState.NORMAL)
-                    maze.start_cell = mouse_cell
-                    pen.update_cell(maze.start_cell, CellState.START)
-
-                    if algo_was_run:
-                        pen.reset_maze(maze)
-                        algo_was_run = False
-
-                elif drag_end_point:
-                    pen.update_cell(maze.end_cell, CellState.NORMAL)
-                    maze.end_cell = mouse_cell
-                    pen.update_cell(maze.end_cell, CellState.END)
-
+                if dragged_kind:
+                    pen.move_start_or_end(mouse_cell, dragged_kind)
                     if algo_was_run:
                         pen.reset_maze(maze)
                         algo_was_run = False
@@ -247,7 +225,7 @@ def loop(pen: GridPen):
 def launch():
     maze = Maze(nrows=50, ncols=100)
     pen = PyGamePen(maze)
-    maze.apply_gen(WilsonGenerate(), pen=pen)
+    maze.apply_gen(PrimGenerate(), pen=pen)
     print(maze)
     loop(pen)
 

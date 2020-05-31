@@ -59,6 +59,8 @@ class GridPen(metaclass=ABCMeta):
 
     def __init__(self, maze: 'Maze'):
         self.__maze = maze
+        self.__cell_kind_map = {}
+        self.__reset_kind_map()
 
 
     @property
@@ -88,9 +90,42 @@ class GridPen(metaclass=ABCMeta):
             self.update_cell(c, sel(c))
 
 
+    def move_start_or_end(self, new_pos: Cell, kind: CellKind):
+        if not kind:
+            return
+        assert kind != CellKind.REGULAR, "need START or END"
+
+        old = self.__cell_kind_map[kind]
+        if old == new_pos:
+            return None
+        
+        if kind == CellKind.START:
+            self.maze.start_cell = new_pos
+        elif kind == CellKind.END:
+            self.maze.end_cell = new_pos
+
+        self.__reset_kind_map()
+
+        self.update_cells([old, new_pos], state=CellState.NORMAL)
+
+
+    def get_kind(self, cell: Cell):
+        return self.__cell_kind_map.get(cell, CellKind.REGULAR)
+
+
     def reset_maze(self, maze: 'Maze'):
         """Repaint the whole grid, the maze may have different dimensions (resize window)"""
         self.__maze = maze
+        self.__reset_kind_map()
+
+
+    def __reset_kind_map(self):
+        self.__cell_kind_map = {
+            self.maze.end_cell: CellKind.END,
+            self.maze.start_cell: CellKind.START,
+            CellKind.END: self.maze.end_cell,
+            CellKind.START: self.maze.start_cell,
+        }
 
 
     def _state_selector(self, state):
