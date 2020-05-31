@@ -98,7 +98,7 @@ class GridPen(metaclass=ABCMeta):
         old = self.__cell_kind_map[kind]
         if old == new_pos:
             return None
-        
+
         if kind == CellKind.START:
             self.maze.start_cell = new_pos
         elif kind == CellKind.END:

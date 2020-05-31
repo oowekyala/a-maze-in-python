@@ -5,6 +5,7 @@ import pygame
 
 from maze.viz import *
 from maze.gen import *
+from maze.solver import *
 from maze.model import *
 
 
@@ -226,6 +227,8 @@ def launch():
     maze = Maze(nrows=50, ncols=100)
     pen = PyGamePen(maze)
     maze.apply_gen(PrimGenerate(), pen=pen)
+    time.sleep(2)
+    DfsSolver().solve(maze, pen)
     print(maze)
     loop(pen)
 

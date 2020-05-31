@@ -185,12 +185,6 @@ class GenerationAlgo(metaclass=ABCMeta):
         pass
 
 
-    @staticmethod
-    def _break_wall_between(break_wall_fun, c1, c2):
-        break_wall_fun(Cell(x=(c1.x + c2.x) // 2,
-                            y=(c1.y + c2.y) // 2))
-
-
 
 class PrimGenerate(GenerationAlgo):
 
