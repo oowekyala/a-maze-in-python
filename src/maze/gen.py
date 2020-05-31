@@ -33,19 +33,16 @@ class Maze(object):
 
 
     def rand_cell(self):
-        """Generate a random cell from the kernel set of this maze. (see is_kernel)"""
-        return Cell(x=random.randrange(0, self.height, 2),
-                    y=random.randrange(0, self.width, 2))
+        """Generate a random cell in this maze"""
+        return Cell(x=random.randrange(0, self.height),
+                    y=random.randrange(0, self.width))
 
 
     def apply_gen(self, gen: 'GenerationAlgo', pen: GridPen):
         self.reset()
         pen.reset_maze(maze=self)
 
-        pen.update_cells(self.all_cells(), state=CellState.DORMANT, global_update=True)
-
-        pen.update_cell(self.start_cell, CellState.START)
-        pen.update_cell(self.end_cell, CellState.END)
+        pen.update_cells(self.all_cells(), state=CellState.UNDISCOVERED, global_update=True)
 
         gen.generate(maze=self, seed=self.start_cell, pen=pen)
 
@@ -66,24 +63,6 @@ class Maze(object):
     def new_cell_set(self, initial_value: bool = False) -> Cell.CellSet:
         return Cell.CellSet.with_initial(height=self.height, width=self.width, initial_value=initial_value)
 
-    def neighbors_list(self,
-                       cell: Cell,
-                       *,
-                       shift: int = 1,
-                       include_walls: bool = False,
-                       include_diag: bool = False,
-                       blacklist: Optional[Cell.CellSet] = None,
-                       whitelist: Optional[Cell.CellSet] = None):
-        return [c
-                for s in (list(Neighbour) if include_diag else list(Side))
-                for c in [cell.next(s, shift=shift)]
-                if c in self
-                if include_walls or c in self.__free_cells
-                if (not blacklist or c not in blacklist)
-                if (not whitelist or c in whitelist)
-                ]
-
-
     def walls_around(self, cell: Cell, *, blacklist=None):
         return [w
                 for s in list(Side)
@@ -94,50 +73,47 @@ class Maze(object):
 
     @property
     def height(self) -> int:
-        """Number of rows, ie height, ie max value (exclusive) of the y coordinate of a Cell"""
+        """Number of rows, ie height, ie max value (exclusive) of the x coordinate of a Cell"""
         return self.__nrows
 
 
     @property
     def width(self) -> int:
-        """Number of columns, ie width, ie max value (exclusive) of the x coordinate of a Cell"""
+        """Number of columns, ie width, ie max value (exclusive) of the y coordinate of a Cell"""
         return self.__ncols
 
 
     def has_wall(self, wall: Wall) -> bool:
+        """True if the wall exists, false if not. Throws IndexError if cell is out-of-bounds."""
         self.__check_pos(wall.cell)
+        if wall.next_cell not in self:
+            return True
+
         (cell, side) = wall
 
-        if side == Side.RIGHT:
-            return cell.y == self.width - 1 or self.has_wall(Wall(wall.next_cell, Side.LEFT))
-        elif side == Side.BOT:
-            return cell.x == self.height - 1 or self.has_wall(Wall(wall.next_cell, Side.TOP))
-
-        # Side is LEFT or TOP
-        return cell in self.__walls[side]
-
-
-    def is_wall(self, cell: Cell) -> bool:
-        return cell not in self.__free_cells
-
-
-    def set_wall(self, wall: Wall, is_active: bool = True) -> None:
-        self.__check_pos(wall.cell)
-        (cell, side) = wall
-
-        if side == Side.RIGHT and cell.y < self.width - 1:
-            self.set_wall(Wall(wall.next_cell, Side.LEFT), is_active)
-        elif side == Side.BOT and cell.x < self.height - 1:
-            self.set_wall(Wall(wall.next_cell, Side.TOP), is_active)
+        if side == Side.RIGHT or side == Side.BOT:
+            return wall.next_cell in self.__walls[~side]
         else:
-            # Side is LEFT or TOP
-            self.__walls[side] += cell
+            return cell in self.__walls[side]
+
+
+    def set_wall(self, wall: Wall, is_present: bool = True) -> None:
+        """Set the given wall, or unsets it. Boundaries of the maze cannot be set."""
+        self.__check_pos(wall.cell)
+        if wall.next_cell not in self:
+            return None
+
+        (cell, side) = wall
+
+        if side == Side.RIGHT or side == Side.BOT:
+            self.__walls[~side][wall.next_cell] = is_present
+        else:
+            self.__walls[side][cell] = is_present
 
 
     def __check_pos(self, cell: Cell) -> None:
         if cell not in self:
             raise IndexError(cell)
-
 
     def __contains__(self, cell: Cell) -> bool:
         return 0 <= cell.x < self.height \
@@ -250,7 +226,7 @@ class PrimGenerate(GenerationAlgo):
                 # assert wall.next_cell in maze  # if it was added to the set of walls, then it is in the maze
 
                 visited += wall.next_cell
-                pen.update_cell(wall.next_cell, CellState.BLANK)
+                pen.update_cell(wall.next_cell, CellState.NORMAL)
                 new_walls = walls_around(wall.next_cell)
                 walls.update(new_walls)
                 pen.update_walls(new_walls, WallState.ACTIVE)
@@ -272,7 +248,7 @@ class DfsGenerate(GenerationAlgo):
 
         while True:
             visited += cell
-            pen.update_cell(cell, CellState.BLANK)
+            pen.update_cell(cell, CellState.NORMAL)
 
             walls: List[Wall] = maze.walls_around(cell, blacklist=visited)
 
@@ -361,8 +337,12 @@ class WilsonGenerate(GenerationAlgo):
                         loop_start = next(i for i in range(len(path)) if path[i].cell == next_cell)
 
                     for wall in path[loop_start + 1:]:
-                        in_path -= wall.next_cell
-                        pen.update_cell(wall.next_cell, CellState.WALL)
+                        nc = wall.next_cell
+                        in_path -= nc
+                        if nc == maze.end_cell:
+                            pen.update_cell(wall.next_cell, CellState.UNDISCOVERED)
+                        else:
+                            pen.update_cell(wall.next_cell, CellState.UNDISCOVERED)
 
                     cur_cell = path_start if loop_start < 0 else path[loop_start].next_cell
 
@@ -379,10 +359,10 @@ class WilsonGenerate(GenerationAlgo):
             # break walls separating items of the path
 
             for wall in path:
-                pen.update_cell(wall.cell, CellState.BLANK)
+                pen.update_cell(wall.cell, CellState.NORMAL)
                 maze.break_wall(wall, pen)
 
-            pen.update_cell(path_start, CellState.BLANK)
+            pen.update_cell(cur_cell, CellState.NORMAL)
 
             in_maze |= in_path
             in_path.setall(False)

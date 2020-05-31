@@ -14,6 +14,15 @@ class Side(Enum):
     RIGHT = auto()
     BOT = auto()
 
+    def __invert__(self):
+        if self == Side.LEFT:
+            return Side.RIGHT
+        elif self == Side.RIGHT:
+            return Side.LEFT
+        elif self == Side.TOP:
+            return Side.BOT
+        elif self == Side.BOT:
+            return Side.TOP
 
 
 @unique

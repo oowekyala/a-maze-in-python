@@ -1,28 +1,30 @@
 from maze.model import *
 from abc import abstractmethod, ABCMeta
 from enum import Enum, auto, unique
-from typing import Iterable, Union, Callable
+from typing import Iterable, Union, Callable, Dict
+
+
 
 @unique
 class CellState(Enum):
-    ACTIVE = auto()  # Current path
-    BEST_PATH = auto()  # Best path
-    IGNORED = auto()  # Abandoned path
-    DORMANT = auto()  # Grid of freeable cells
-    BLANK = auto()
-    WALL = auto()
+    ACTIVE = auto()
+    BEST_PATH = auto()
+    IGNORED = auto()
+    NORMAL = auto()
+    UNDISCOVERED = auto()
 
+
+
+@unique
+class CellKind(Enum):
+    REGULAR = auto()
     START = auto()
     END = auto()
-
-
 
 class WallState(Enum):
     ACTIVE = auto()
     OFF = auto()
     ON = auto()
-
-
 
 @unique
 class Color(Enum):
@@ -43,6 +45,16 @@ class Color(Enum):
 
 
 
+def StateSelector(i, o):
+    return Union[o, Callable[[i], Optional[o]], Dict[i, o]]
+
+
+
+CellStateSelector = StateSelector(Cell, CellState)
+WallStateSelector = StateSelector(Wall, WallState)
+
+
+
 class GridPen(metaclass=ABCMeta):
 
     def __init__(self, maze: 'Maze'):
@@ -55,30 +67,25 @@ class GridPen(metaclass=ABCMeta):
 
 
     @abstractmethod
-    def update_cell(self, cell: Cell, state: CellState) -> None:
+    def update_cell(self, cell: Cell, state: CellStateSelector) -> None:
         """Update the state of a cell (and repaint)"""
         pass
 
 
-    def update_wall(self, wall: Wall, state: WallState) -> None:
+    def update_wall(self, wall: Wall, state: WallStateSelector) -> None:
         pass
 
 
-    def update_walls(self, walls: Iterable[Wall], state: WallState) -> None:
+    def update_walls(self, walls: Iterable[Wall], state: WallStateSelector) -> None:
         for wall in walls:
             self.update_wall(wall, state)
 
 
-    def update_cells(self,
-                     cells: Iterable[Cell],
-                     state: Union[CellState, Callable[[Cell], Optional[CellState]]],
-                     global_update: bool = False) -> None:
+    def update_cells(self, cells: Iterable[Cell], state: CellStateSelector, global_update: bool = False) -> None:
         """Batch update"""
+        sel = self._state_selector(state)
         for c in cells:
-            if isinstance(state, CellState):
-                self.update_cell(c, state)
-            else:
-                self.update_cell(c, state(c))
+            self.update_cell(c, sel(c))
 
 
     def reset_maze(self, maze: 'Maze'):
@@ -86,10 +93,20 @@ class GridPen(metaclass=ABCMeta):
         self.__maze = maze
 
 
+    def _state_selector(self, state):
+        if isinstance(state, dict):
+            return lambda c: state.get(c, None)
+        elif isinstance(state, Callable):
+            return state
+        else:
+            return lambda c: state
+
+
     @abstractmethod
     def paint_everything(self):
         """"""
         pass
+
 
     @staticmethod
     def __noop_pen(maze: 'Maze') -> 'GridPen':
@@ -98,7 +115,16 @@ class GridPen(metaclass=ABCMeta):
             def __init__(self):
                 super().__init__(maze)
 
+
             def paint_everything(self):
+                pass
+
+
+            def update_cells(self, cells, state, global_update: bool = False) -> None:
+                pass
+
+
+            def update_walls(self, walls, state) -> None:
                 pass
 
 

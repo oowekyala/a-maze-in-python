@@ -8,7 +8,6 @@ from maze.gen import *
 from maze.model import *
 
 
-
 class PyGamePen(GridPen):
     CELL_WIDTH = 8
     CELL_HEIGHT = CELL_WIDTH
@@ -19,23 +18,22 @@ class PyGamePen(GridPen):
     CORRIDOR_COLOR = Color.WHITE
     WALL_COLOR = Color.BLACK
 
-    state_colors = {
-        CellState.BLANK: CORRIDOR_COLOR,
-        CellState.WALL: WALL_COLOR,
+    cell_colors = {
+        CellKind.REGULAR: {
+            CellState.ACTIVE: Color.GREEN,
+            CellState.IGNORED: Color.YELLOW,
+            CellState.BEST_PATH: Color.BLUE,
+            CellState.NORMAL: CORRIDOR_COLOR,
+            CellState.UNDISCOVERED: Color.GREY
+        },
+        CellKind.START: {s: Color.RED for s in list(CellState)},
+        CellKind.END: {s: Color.ORANGE for s in list(CellState)},
+    }
 
+    wall_colors = {
         WallState.ON: WALL_COLOR,
         WallState.OFF: CORRIDOR_COLOR,
-
-        CellState.DORMANT: Color.GREY,
-
-        CellState.IGNORED: Color.YELLOW,
-        CellState.BEST_PATH: Color.BLUE,
-
-        CellState.ACTIVE: Color.GREEN,
         WallState.ACTIVE: Color.GREEN,
-
-        CellState.START: Color.RED,
-        CellState.END: Color.RED,
     }
 
 
@@ -44,6 +42,7 @@ class PyGamePen(GridPen):
         pygame.init()
         self.clock = pygame.time.Clock()
         self.__screen = PyGamePen.__size_window(maze)
+        self.__cell_kind_map = {}
         self.reset_maze(maze)
 
 
@@ -78,36 +77,39 @@ class PyGamePen(GridPen):
         )
 
 
-    def update_cell(self, cell: Cell, state: CellState) -> None:
-        self.__single_update(rect=PyGamePen._cell_rect(cell), state=state)
+    def get_kind(self, cell: Cell):
+        return self.__cell_kind_map.get(cell, CellKind.REGULAR)
 
-    def __single_update(self, rect: pygame.Rect, state: Union[CellState, WallState]):
-        color = PyGamePen.state_colors[state].value
+    def update_cell(self, cell: Cell, state: CellStateSelector) -> None:
+        kind = self.get_kind(cell)
+        state=self._state_selector(state)(cell)
+        self.__single_update(rect=PyGamePen._cell_rect(cell), color=PyGamePen.cell_colors[kind][state])
 
-        pygame.draw.rect(self.__screen, color, rect)
+
+    def __single_update(self, rect: pygame.Rect, color: Color):
+        pygame.draw.rect(self.__screen, color.value, rect)
         pygame.display.update(rect)
         pygame.event.pump()
 
 
-    def update_wall(self, wall: Wall, state: WallState) -> None:
-        self.__single_update(rect=PyGamePen._wall_rect(wall), state=state)
+    def update_wall(self, wall: Wall, state: WallStateSelector) -> None:
+        wall_state = self._state_selector(state)(wall)
+        self.__single_update(rect=PyGamePen._wall_rect(wall), color=PyGamePen.wall_colors[wall_state])
 
 
     def update_cells(self,
                      cells: Iterable[Cell],
-                     state: Union[CellState, Callable[[Cell], Optional[CellState]]],
+                     state: CellStateSelector,
                      global_update: bool = False) -> None:
         area_to_update: Optional[Rect] = None
-        for cell in cells:
-            if isinstance(state, CellState):
-                s = state
-            else:
-                s = state(cell)
+        sel = self._state_selector(state)
 
+        for cell in cells:
+            s = sel(cell)
             if not s:
                 continue
 
-            color = PyGamePen.state_colors[s].value
+            color = PyGamePen.cell_colors[self.get_kind(cell)][s].value
             rect = PyGamePen._cell_rect(cell)
             pygame.draw.rect(self.__screen, color, rect)
 
@@ -136,14 +138,17 @@ class PyGamePen(GridPen):
         if prev_maze is not maze:
             self.__screen = PyGamePen.__size_window(maze)
 
+        self.__cell_kind_map = {
+            maze.end_cell: CellKind.END,
+            maze.start_cell: CellKind.START
+        }
+
         self.__draw_entire_maze(maze)
 
 
     def __draw_entire_maze(self, maze: Maze):
         self.__screen.fill(PyGamePen.WALL_COLOR.value)
         maze.draw_regular_tiles(self)
-        self.update_cell(maze.start_cell, CellState.START)
-        self.update_cell(maze.end_cell, CellState.END)
 
 
     @staticmethod
@@ -218,7 +223,7 @@ def loop(pen: GridPen):
 
                 # Move the start point
                 if drag_start_point:
-                    pen.update_cell(maze.start_cell, CellState.BLANK)
+                    pen.update_cell(maze.start_cell, CellState.NORMAL)
                     maze.start_cell = mouse_cell
                     pen.update_cell(maze.start_cell, CellState.START)
 
@@ -227,7 +232,7 @@ def loop(pen: GridPen):
                         algo_was_run = False
 
                 elif drag_end_point:
-                    pen.update_cell(maze.end_cell, CellState.BLANK)
+                    pen.update_cell(maze.end_cell, CellState.NORMAL)
                     maze.end_cell = mouse_cell
                     pen.update_cell(maze.end_cell, CellState.END)
 
