@@ -9,30 +9,37 @@ from maze.solver import *
 from maze.model import *
 
 
+
+def conv_color(color: Color) -> pygame.Color:
+    return pygame.Color(color.value)
+
+
+
+CELL_WIDTH = 5
+CELL_HEIGHT = CELL_WIDTH  # Cells are square
+MARGIN = 1  # Padding between cells
+
+CORRIDOR_COLOR = Color.WHITE
+WALL_COLOR = Color.BLACK
+
+cell_colors: Dict[CellKind, Dict[CellState, Color]] = {
+    CellKind.REGULAR: {
+        CellState.ACTIVE: Color.GREEN,
+        CellState.IGNORED: Color.YELLOW,
+        CellState.BEST_PATH: Color.BLUE,
+        CellState.NORMAL: CORRIDOR_COLOR,
+        CellState.UNDISCOVERED: Color.GREY
+    },
+    CellKind.START: {s: Color.RED for s in list(CellState)},
+    CellKind.END: {s: Color.ORANGE for s in list(CellState)},
+}
+
+cell_colors[CellKind.WALL_OFF] = {**cell_colors[CellKind.REGULAR], CellState.UNDISCOVERED: WALL_COLOR}
+cell_colors[CellKind.WALL_ON] = {**cell_colors[CellKind.WALL_OFF], CellState.NORMAL: WALL_COLOR}
+
+
+
 class PyGamePen(GridPen):
-    CELL_WIDTH = 4
-    CELL_HEIGHT = CELL_WIDTH
-    # Margin separating each cell
-    MARGIN = 0
-    BUTTON_HEIGHT = 0  # TODO
-
-    CORRIDOR_COLOR = Color.WHITE
-    WALL_COLOR = Color.BLACK
-
-    cell_colors = {
-        CellKind.REGULAR: {
-            CellState.ACTIVE: Color.GREEN,
-            CellState.IGNORED: Color.YELLOW,
-            CellState.BEST_PATH: Color.BLUE,
-            CellState.NORMAL: CORRIDOR_COLOR,
-            CellState.UNDISCOVERED: Color.GREY
-        },
-        CellKind.START: {s: Color.RED for s in list(CellState)},
-        CellKind.END: {s: Color.ORANGE for s in list(CellState)},
-    }
-
-    cell_colors[CellKind.WALL_OFF] = {**cell_colors[CellKind.REGULAR], CellState.UNDISCOVERED: WALL_COLOR}
-    cell_colors[CellKind.WALL_ON] = {**cell_colors[CellKind.WALL_OFF], CellState.NORMAL: WALL_COLOR}
 
     def __init__(self, maze: Maze):
         super().__init__(maze)
@@ -67,14 +74,14 @@ class PyGamePen(GridPen):
     @staticmethod
     def __rect(x, y) -> pygame.Rect:
         return Rect(
-            (PyGamePen.MARGIN + PyGamePen.CELL_WIDTH) * y + PyGamePen.MARGIN,
-            (PyGamePen.MARGIN + PyGamePen.CELL_HEIGHT) * x + PyGamePen.MARGIN,
-            PyGamePen.CELL_WIDTH,
-            PyGamePen.CELL_HEIGHT
+            (MARGIN + CELL_WIDTH) * y + MARGIN,
+            (MARGIN + CELL_HEIGHT) * x + MARGIN,
+            CELL_WIDTH,
+            CELL_HEIGHT
         )
 
     def __single_update(self, rect: pygame.Rect, color: Color):
-        pygame.draw.rect(self.__screen, color.value, rect)
+        pygame.draw.rect(self.__screen, conv_color(color), rect)
         pygame.display.update(rect)
         pygame.event.pump()
 
@@ -86,7 +93,7 @@ class PyGamePen(GridPen):
 
         def get_color(wall: Wall):
             kind = CellKind.WALL_ON if self.maze.has_wall(wall) else CellKind.WALL_OFF
-            return PyGamePen.cell_colors[kind][state]
+            return cell_colors[kind][state]
 
 
         if len(walls) == 1:
@@ -101,7 +108,7 @@ class PyGamePen(GridPen):
 
         def get_color(cell: Cell):
             s = sel(cell)
-            return PyGamePen.cell_colors[self.get_kind(cell)][s] if s else None
+            return cell_colors[self.get_kind(cell)][s] if s else None
 
         if len(cells) == 1:
             self.__single_update(rect=PyGamePen._cell_rect(cells[0]), color=get_color(cells[0]))
@@ -110,7 +117,6 @@ class PyGamePen(GridPen):
 
 
     T = TypeVar('T')
-
 
     def _batched_update(self,
                         cells: Iterable[T],
@@ -125,7 +131,7 @@ class PyGamePen(GridPen):
                 continue
 
             rect = get_rect(cell)
-            pygame.draw.rect(self.__screen, color.value, rect)
+            pygame.draw.rect(self.__screen, conv_color(color), rect)
 
             if not global_update:
                 if area_to_update:
@@ -156,7 +162,7 @@ class PyGamePen(GridPen):
 
 
     def __draw_entire_maze(self, maze: Maze):
-        self.__screen.fill(PyGamePen.WALL_COLOR.value)
+        self.__screen.fill(conv_color(WALL_COLOR))
         maze.draw_regular_tiles(self)
         pygame.display.flip()
 
@@ -165,8 +171,8 @@ class PyGamePen(GridPen):
     def __size_window(maze: Maze) -> pygame.Surface:
         # Set the width and height of the screen [width, height]
 
-        screen_width = PyGamePen.__grid_size(maze.width, PyGamePen.CELL_WIDTH)
-        screen_height = PyGamePen.__grid_size(maze.height, PyGamePen.CELL_HEIGHT)
+        screen_width = PyGamePen.__grid_size(maze.width, CELL_WIDTH)
+        screen_height = PyGamePen.__grid_size(maze.height, CELL_HEIGHT)
         window_size = (screen_width, screen_height)
 
         return pygame.display.set_mode(window_size)
@@ -174,7 +180,7 @@ class PyGamePen(GridPen):
 
     @staticmethod
     def __grid_size(dim: int, inc: int):
-        return (2 * dim + 1) * (inc + PyGamePen.MARGIN) + PyGamePen.MARGIN * 2
+        return (2 * dim + 1) * (inc + MARGIN) + MARGIN * 2
 
 
 
@@ -183,8 +189,8 @@ def get_mouse_cell():
     pos = pygame.mouse.get_pos()
 
     # Change the x/y screen coordinates to grid coordinates
-    column = pos[0] // (PyGamePen.CELL_WIDTH + PyGamePen.MARGIN)
-    row = pos[1] // (PyGamePen.CELL_HEIGHT + PyGamePen.MARGIN)
+    column = pos[0] // (CELL_WIDTH + MARGIN)
+    row = pos[1] // (CELL_HEIGHT + MARGIN)
     return Cell(x=(row - 1) // 2, y=(column - 1) // 2)
 
 
@@ -247,11 +253,9 @@ def launch(generator, solver, nrows, ncols, random_seed=random.randint(0, 100_00
     loop(pen)
 
 
-# TODO remove pygame, use tkinter
-# https://www.python-course.eu/tkinter_menus.php
-
-launch(generator=DfsGenerate(),
-       random_seed=87448,
-       solver=DfsSolver(),
-       nrows=120,
-       ncols=220)
+if __name__ == "__main__":
+    launch(generator=DfsGenerate(),
+           random_seed=87448,
+           solver=DfsSolver(),
+           nrows=80,
+           ncols=100)
