@@ -238,15 +238,20 @@ def loop(pen: GridPen):
 
 
 
-def launch():
-    seed = random.randint(0, 100_000)
-    maze = Maze(nrows=120, ncols=220, random_seed=seed)
-    print(maze.random_seed)
+def launch(generator, solver, nrows, ncols, random_seed=random.randint(0, 100_000)):
+    maze = Maze(nrows=nrows, ncols=ncols, random_seed=random_seed)
+    print("Maze seed: %d" % maze.random_seed)
     pen = PyGamePen(maze)
-    maze.apply_gen(WilsonGenerate(), pen=pen)
-    DfsSolver().solve(maze, pen)
+    maze.apply_gen(generator, pen=pen)
+    solver.solve(maze, pen)
     loop(pen)
 
 
+# TODO remove pygame, use tkinter
+# https://www.python-course.eu/tkinter_menus.php
 
-launch()
+launch(generator=DfsGenerate(),
+       random_seed=87448,
+       solver=DfsSolver(),
+       nrows=120,
+       ncols=220)

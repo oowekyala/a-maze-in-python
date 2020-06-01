@@ -31,8 +31,8 @@ class Maze(object):
         self.random = Random(random_seed)
         self.random_seed = random_seed
 
-        self.start_cell = self.rand_cell()
-        self.end_cell = self.rand_cell()
+        self.start_cell = Cell(0, 0)
+        self.end_cell = Cell(x=self.height - 1, y=self.width - 1)
 
         self.reset()
 
@@ -226,6 +226,8 @@ class PrimGenerate(GenerationAlgo):
             else:
                 pen.update_walls(wall)  # Remove ACTIVE status
 
+            pen.algo_tick(self)
+
 
 
 class DfsGenerate(GenerationAlgo):
@@ -239,6 +241,8 @@ class DfsGenerate(GenerationAlgo):
         while True:
             visited += cell
             pen.update_cells(cell, state=CellState.NORMAL)
+
+            pen.algo_tick(self)
 
             walls: List[Wall] = maze.walls_around(cell, blacklist=visited)
 
@@ -281,7 +285,10 @@ class WilsonGenerate(GenerationAlgo):
         in_maze: Cell.CellSet = maze.new_cell_set(False)
         in_path: Cell.CellSet = maze.new_cell_set(False)
 
-        in_maze += maze.rand_cell()  # TODO seed should be bound to the random source
+        seed = maze.rand_cell()
+        in_maze += seed  # TODO seed should be bound to the random source
+
+        pen.update_cells(seed, state=CellState.NORMAL)
 
         # TODO add seeds. Problem is, each seed forms an independent mazes
         # seeds = [seed]
@@ -318,6 +325,7 @@ class WilsonGenerate(GenerationAlgo):
             path: List[Wall] = []
 
             while cur_cell not in in_maze:  # loop-erased random walk until we find a maze cell
+                pen.algo_tick(self)
 
                 neighbors: List[Wall] = maze.walls_around(cur_cell)
 

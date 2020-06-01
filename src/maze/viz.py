@@ -1,7 +1,7 @@
 from abc import abstractmethod, ABCMeta
 from typing import Callable, Dict, TypeVar
 from enum import Enum, auto, unique
-
+import time
 from maze.model import *
 
 
@@ -79,6 +79,11 @@ class GridPen(metaclass=ABCMeta):
                      *walls: Wall,
                      state: CellState = CellState.NORMAL,
                      global_update: bool = False) -> None:
+        pass
+
+
+    def algo_tick(self, algo_instance):
+        """Record one step in the algorithm currently executing. This may be used to slow down some algorithms."""
         pass
 
 

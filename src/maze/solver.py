@@ -102,6 +102,7 @@ class DfsSolver(SolverAlgo):
         pen.update_cells(cell, state=CellState.BEST_PATH)
 
         while cell != maze.end_cell:
+            pen.algo_tick(self)
             visited += cell
 
             walls: List[Wall] = maze.walls_around(cell, only_passages=True, blacklist=visited)
@@ -132,7 +133,7 @@ class DfsSolver(SolverAlgo):
 
 class HandRuleSolver(SolverAlgo):
 
-    def __init__(self, is_right_hand_rule: bool):
+    def __init__(self, is_right_hand_rule: bool = True):
         self.right_hand = is_right_hand_rule
 
 
@@ -159,7 +160,7 @@ class HandRuleSolver(SolverAlgo):
         orientation = 0  # index in the list
 
         while cell != maze.end_cell:
-            time.sleep(0.002)
+            pen.algo_tick(self)
 
             next_wall = None
             for i in range(num_sides):
