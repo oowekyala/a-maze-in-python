@@ -21,7 +21,65 @@ class SolverAlgo(metaclass=ABCMeta):
 
 
 
+class Heuristic(metaclass=ABCMeta):
+
+    @abstractmethod
+    def pick_path(self, maze: Maze, cell: Cell, walls: List[Wall]) -> (Wall, List[Wall]):
+        """
+        Pick the wall to cross at a junction with the given choices. Returns
+        the wall and the list without the walls.
+
+        :param maze:            Maze
+        :param cell:            Cell of the crossroad (wall.cell for wall in walls)
+        :param walls:           Available choices
+        """
+        pass
+
+
+
+class ManhattanDistance(Heuristic):
+
+    @staticmethod
+    def manhattan(c1: Cell, c2: Cell):
+        return abs(c2.x - c1.x) + abs(c1.y - c2.y)
+
+
+    @staticmethod
+    def best_by(target: Cell, walls: List[Wall], cost_fun: Callable[[Cell, Cell], int]) -> (Wall, int, int):
+        """Minimizes the metric"""
+        best_cost: Optional[int] = None
+        best_wall = None
+        best_i = None
+
+        for i, wall in enumerate(walls):
+            cost = cost_fun(wall.next_cell, target)
+            if not best_cost or best_cost > cost:
+                best_cost = cost
+                best_wall = wall
+                best_i = i
+
+        return best_wall, best_cost, best_i
+
+
+    def pick_path(self, maze: Maze, cell: Cell, walls: List[Wall]) -> (Wall, List[Wall]):
+        (_, _, best_i) = ManhattanDistance.best_by(maze.end_cell, walls, cost_fun=ManhattanDistance.manhattan)
+
+        return walls.pop(best_i), walls
+
+
+
+class NoHeuristic(Heuristic):
+
+    def pick_path(self, maze: Maze, cell: Cell, walls: List[Wall]) -> (Wall, List[Wall]):
+        return walls.pop(), walls
+
+
+
 class DfsSolver(SolverAlgo):
+
+    def __init__(self, heuristic: Heuristic = ManhattanDistance()):
+        self.heuristic = heuristic
+
 
     def solve(self, maze: Maze, pen: GridPen) -> None:
 
@@ -32,7 +90,6 @@ class DfsSolver(SolverAlgo):
         pen.update_cells(cell, state=CellState.BEST_PATH)
 
         while cell != maze.end_cell:
-            time.sleep(0.02)
             visited += cell
 
             walls: List[Wall] = maze.walls_around(cell, only_passages=True, blacklist=visited)
@@ -52,7 +109,7 @@ class DfsSolver(SolverAlgo):
                 assert len(walls) > 0, "Unreachable end cell"
 
             # choose a random passage
-            next_wall: Wall = walls.pop()
+            (next_wall, walls) = self.heuristic.pick_path(maze, cell, walls)
             stack.append((next_wall, walls))
             cell = next_wall.next_cell
 

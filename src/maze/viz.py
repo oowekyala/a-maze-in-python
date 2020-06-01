@@ -138,7 +138,7 @@ class GridPen(metaclass=ABCMeta):
 
 
     @staticmethod
-    def __noop_pen(maze: 'Maze') -> 'GridPen':
+    def noop_pen(maze: 'Maze') -> 'GridPen':
         class __NoopPen(GridPen):
 
             def __init__(self):

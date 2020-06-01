@@ -10,7 +10,7 @@ from maze.model import *
 
 
 class PyGamePen(GridPen):
-    CELL_WIDTH = 8
+    CELL_WIDTH = 4
     CELL_HEIGHT = CELL_WIDTH
     # Margin separating each cell
     MARGIN = 0
@@ -238,11 +238,10 @@ def loop(pen: GridPen):
 
 
 def launch():
-    maze = Maze(nrows=50, ncols=100)
+    maze = Maze(nrows=120, ncols=220)
     pen = PyGamePen(maze)
-    maze.apply_gen(PrimGenerate(), pen=pen)
-    time.sleep(2)
-    HandRuleSolver(is_right_hand_rule=False).solve(maze, pen)
+    maze.apply_gen(DfsGenerate(), pen=pen)
+    DfsSolver().solve(maze, pen)
     print(maze)
     loop(pen)
 

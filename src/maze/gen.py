@@ -293,10 +293,21 @@ class WilsonGenerate(GenerationAlgo):
 
         in_maze += seed  # TODO first cell should not be the seed
 
+        # TODO add seeds. Problem is, each seed forms an independent mazes
+        # seeds = [seed]
+        # for i in range((maze.width * maze.height) // (50 * 50)):
+        #     # big maze, add seeds
+        #     seed = maze.rand_cell()
+        #     in_maze += seed
+        #     seeds.append(seed)
+        #
+        # pen.update_cells(*seeds, state=CellState.NORMAL)
+
         last_cell = Cell(0, 0)
 
+
         def random_not_in_maze():
-            # Linear brute force TODO memo last try
+            # Linear brute force, memos last try so that it doesn't slow down over time
             try:
                 nonlocal last_cell
                 c = next(c for c in maze.all_cells(from_cell=last_cell) if c not in in_maze)
