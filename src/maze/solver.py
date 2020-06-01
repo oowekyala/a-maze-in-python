@@ -2,6 +2,7 @@ from maze.model import *
 from maze.gen import *
 from maze.viz import *
 import random, time
+from random import Random
 from typing import Callable, List, Tuple
 from abc import abstractmethod, ABCMeta
 
@@ -72,6 +73,17 @@ class NoHeuristic(Heuristic):
 
     def pick_path(self, maze: Maze, cell: Cell, walls: List[Wall]) -> (Wall, List[Wall]):
         return walls.pop(), walls
+
+
+
+class ShuffleHeuristic(Heuristic):
+
+    def __init__(self, seed: Optional[int] = None):
+        self.random = Random(x=seed)
+
+    def pick_path(self, maze: Maze, cell: Cell, walls: List[Wall]) -> (Wall, List[Wall]):
+        i = self.random.randrange(0, len(walls))
+        return walls.pop(i), walls
 
 
 

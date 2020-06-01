@@ -1,6 +1,8 @@
-from maze.model import  *
+from maze.model import *
 from maze.viz import *
-import random, time
+import time
+
+from random import Random
 from typing import Callable, List, Tuple
 from abc import abstractmethod, ABCMeta
 
@@ -18,13 +20,16 @@ class Maze(object):
        """
 
 
-    def __init__(self, nrows: int, ncols: int):
+    def __init__(self, nrows: int, ncols: int, random_seed: int):
         if nrows <= 0 or ncols <= 0:
             raise AssertionError("Dimensions must be >= 0, got %d, %d" % (nrows, ncols))
 
         self.__size = nrows * ncols
         self.__nrows = nrows
         self.__ncols = ncols
+
+        self.random = Random(random_seed)
+        self.random_seed = random_seed
 
         self.start_cell = self.rand_cell()
         self.end_cell = self.rand_cell()
@@ -34,8 +39,8 @@ class Maze(object):
 
     def rand_cell(self):
         """Generate a random cell in this maze"""
-        return Cell(x=random.randrange(0, self.height),
-                    y=random.randrange(0, self.width))
+        return Cell(x=self.random.randrange(0, self.height),
+                    y=self.random.randrange(0, self.width))
 
 
     def apply_gen(self, gen: 'GenerationAlgo', pen: GridPen):
@@ -44,7 +49,7 @@ class Maze(object):
 
         pen.update_cells(*self.all_cells(), state=CellState.UNDISCOVERED, global_update=True)
 
-        gen.generate(maze=self, seed=self.start_cell, pen=pen)
+        gen.generate(maze=self, pen=pen)
 
 
     def break_wall(self, wall: Wall, pen: GridPen):
@@ -171,15 +176,11 @@ class Maze(object):
 class GenerationAlgo(metaclass=ABCMeta):
 
     @abstractmethod
-    def generate(self,
-                 maze: Maze,
-                 seed: Cell,
-                 pen: GridPen) -> None:
+    def generate(self, maze: Maze, pen: GridPen) -> None:
         """
         Generate the maze by breaking some walls. Initially all walls are
         set.
 
-        :param seed:            Seed for the algo (if it needs a starting cell)
         :param maze:            Receiver maze
         :param pen:             Pen to draw the generation
         """
@@ -189,10 +190,7 @@ class GenerationAlgo(metaclass=ABCMeta):
 
 class PrimGenerate(GenerationAlgo):
 
-    def generate(self,
-                 maze: Maze,
-                 seed: Cell,
-                 pen: GridPen) -> None:
+    def generate(self, maze: Maze, pen: GridPen) -> None:
 
         visited = maze.new_cell_set()
 
@@ -200,10 +198,11 @@ class PrimGenerate(GenerationAlgo):
             return maze.walls_around(cell, blacklist=visited)
 
 
+        seed = maze.rand_cell()
         walls = set(walls_around(seed))
         pen.update_walls(*walls, state=CellState.ACTIVE)
 
-        visited += maze.start_cell
+        visited += seed
 
         # While there are walls in the list:
         # Pick a random wall from the list. If only one of the cells that the wall divides is visited, then:
@@ -211,7 +210,7 @@ class PrimGenerate(GenerationAlgo):
         # # Add the neighboring walls of the cell to the wall list.
         # Remove the wall from the list.
         while len(walls) > 0:
-            wall: Wall = random.choice(tuple(walls))
+            wall: Wall = maze.random.choice(tuple(walls))
             walls.remove(wall)
 
             if (wall.cell in visited) ^ (wall.next_cell in visited):  # exactly one was visited
@@ -234,14 +233,11 @@ class PrimGenerate(GenerationAlgo):
 
 class DfsGenerate(GenerationAlgo):
 
-    def generate(self,
-                 maze: Maze,
-                 seed: Cell,
-                 pen: GridPen) -> None:
+    def generate(self, maze: Maze, pen: GridPen) -> None:
 
         visited = maze.new_cell_set(False)
         stack = []
-        cell = seed
+        cell = maze.rand_cell()
 
         while True:
             visited += cell
@@ -263,7 +259,7 @@ class DfsGenerate(GenerationAlgo):
                     break
 
             # choose a random wall to break, continue the visit there
-            next_wall: Wall = random.choice(walls)
+            next_wall: Wall = maze.random.choice(walls)
 
             maze.break_wall(next_wall, pen)
 
@@ -283,15 +279,12 @@ class WilsonGenerate(GenerationAlgo):
     """
 
 
-    def generate(self,
-                 maze: Maze,
-                 seed: Cell,
-                 pen: GridPen) -> None:
+    def generate(self, maze: Maze, pen: GridPen) -> None:
 
         in_maze: Cell.CellSet = maze.new_cell_set(False)
         in_path: Cell.CellSet = maze.new_cell_set(False)
 
-        in_maze += seed  # TODO first cell should not be the seed
+        in_maze += maze.rand_cell()  # TODO seed should be bound to the random source
 
         # TODO add seeds. Problem is, each seed forms an independent mazes
         # seeds = [seed]
@@ -335,7 +328,7 @@ class WilsonGenerate(GenerationAlgo):
                 if len(neighbors) == 0:
                     raise AssertionError("No reachable neighbour from %s" % cur_cell)
 
-                next_wall: Wall = random.choice(neighbors)
+                next_wall: Wall = maze.random.choice(neighbors)
                 next_cell: Cell = next_wall.next_cell
 
                 if next_cell in in_path:  # loop in the path

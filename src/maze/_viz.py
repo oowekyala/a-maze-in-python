@@ -238,11 +238,12 @@ def loop(pen: GridPen):
 
 
 def launch():
-    maze = Maze(nrows=120, ncols=220)
+    seed = random.randint(0, 100_000)
+    maze = Maze(nrows=120, ncols=220, random_seed=seed)
+    print(maze.random_seed)
     pen = PyGamePen(maze)
-    maze.apply_gen(DfsGenerate(), pen=pen)
+    maze.apply_gen(PrimGenerate(), pen=pen)
     DfsSolver().solve(maze, pen)
-    print(maze)
     loop(pen)
 
 
