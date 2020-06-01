@@ -83,10 +83,8 @@ class GridPen(metaclass=ABCMeta):
 
 
     def paint_wall_path(self, *walls: Wall, state: CellState):
-        for wall in walls:
-            self.update_cells(wall.next_cell, state=state)
-            self.update_walls(wall, state=state)
-
+        self.update_cells(*[w.next_cell for w in walls], state=state)
+        self.update_walls(*walls, state=state)
 
     def update_cells(self, *cells: Cell, state: CellStateSelector, global_update: bool = False) -> None:
         """Batch update"""

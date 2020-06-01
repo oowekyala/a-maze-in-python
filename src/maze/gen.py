@@ -46,9 +46,6 @@ class Maze(object):
     def apply_gen(self, gen: 'GenerationAlgo', pen: GridPen):
         self.reset()
         pen.reset_maze(maze=self)
-
-        pen.update_cells(*self.all_cells(), state=CellState.UNDISCOVERED, global_update=True)
-
         gen.generate(maze=self, pen=pen)
 
 
@@ -156,20 +153,20 @@ class Maze(object):
 
 
     def draw_regular_tiles(self, pen: GridPen) -> None:
-        """Draw walls & blanks, special tiles are added later"""
+        """Draw walls & blanks, special tiles are added later. Only OFF walls need to be updated."""
+
+        pen.update_cells(*self.all_cells(), state=CellState.UNDISCOVERED, global_update=True)
+
+        ws = []
         for cell in self.all_cells():
 
-            if cell in self.__walls[Side.TOP]:
-                pen.update_walls(cell.wall(Side.TOP))
+            if cell not in self.__walls[Side.TOP]:
+                ws.append(cell.wall(Side.TOP))
 
-            if cell in self.__walls[Side.LEFT]:
-                pen.update_walls(cell.wall(Side.LEFT))
+            if cell not in self.__walls[Side.LEFT]:
+                ws.append(cell.wall(Side.LEFT))
 
-            if cell.x == self.height - 1:
-                pen.update_walls(cell.wall(Side.BOT))
-
-            if cell.y == self.width - 1:
-                pen.update_walls(cell.wall(Side.RIGHT))
+        pen.update_walls(*ws, global_update=True)
 
 
 
@@ -321,7 +318,6 @@ class WilsonGenerate(GenerationAlgo):
             path: List[Wall] = []
 
             while cur_cell not in in_maze:  # loop-erased random walk until we find a maze cell
-                time.sleep(0.001)
 
                 neighbors: List[Wall] = maze.walls_around(cur_cell)
 

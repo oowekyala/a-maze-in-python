@@ -158,6 +158,7 @@ class PyGamePen(GridPen):
     def __draw_entire_maze(self, maze: Maze):
         self.__screen.fill(PyGamePen.WALL_COLOR.value)
         maze.draw_regular_tiles(self)
+        pygame.display.flip()
 
 
     @staticmethod
@@ -242,7 +243,7 @@ def launch():
     maze = Maze(nrows=120, ncols=220, random_seed=seed)
     print(maze.random_seed)
     pen = PyGamePen(maze)
-    maze.apply_gen(PrimGenerate(), pen=pen)
+    maze.apply_gen(WilsonGenerate(), pen=pen)
     DfsSolver().solve(maze, pen)
     loop(pen)
 
