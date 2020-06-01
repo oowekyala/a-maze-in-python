@@ -65,9 +65,10 @@ class Maze(object):
     def new_cell_set(self, initial_value: bool = False) -> Cell.CellSet:
         return Cell.CellSet.with_initial(height=self.height, width=self.width, initial_value=initial_value)
 
-    def walls_around(self, cell: Cell, *, only_passages=False, blacklist=None):
+    def walls_around(self, cell: Cell, except_sides: Iterable[Side] = (), only_passages=False, blacklist=None):
         return [w
                 for s in list(Side)
+                if s not in except_sides
                 for w in [cell.wall(s)]
                 if w.next_cell in self
                 if (not only_passages) or (not self.has_wall(w))
@@ -84,6 +85,12 @@ class Maze(object):
     def width(self) -> int:
         """Number of columns, ie width, ie max value (exclusive) of the y coordinate of a Cell"""
         return self.__ncols
+
+
+    @property
+    def num_cells(self) -> int:
+        """Number of cells in the maze"""
+        return self.__size
 
 
     def has_wall(self, wall: Wall) -> bool:
@@ -252,9 +259,11 @@ class DfsGenerate(GenerationAlgo):
                     walls = []
                     for w in walls_p:
                         if w.next_cell in visited:
-                            pen.update_walls(w)
+                            pen.algo_tick(self)
                         else:
                             walls.append(w)
+
+                    pen.update_cells(cell, state=CellState.NORMAL)
 
                 if len(walls) == 0:
                     break
@@ -266,7 +275,7 @@ class DfsGenerate(GenerationAlgo):
 
             walls.remove(next_wall)
             if len(walls) != 0:
-                pen.update_walls(*walls, state=CellState.ACTIVE)
+                pen.update_cells(cell, state=CellState.ACTIVE)
                 stack.append((cell, walls))
 
             cell = next_wall.next_cell
@@ -323,11 +332,12 @@ class WilsonGenerate(GenerationAlgo):
             pen.update_cells(cur_cell, state=CellState.ACTIVE)
             path_start = cur_cell
             path: List[Wall] = []
+            forbidden_moves: Iterable[Side] = ()
 
             while cur_cell not in in_maze:  # loop-erased random walk until we find a maze cell
                 pen.algo_tick(self)
 
-                neighbors: List[Wall] = maze.walls_around(cur_cell)
+                neighbors: List[Wall] = maze.walls_around(cur_cell, except_sides=forbidden_moves)
 
                 if len(neighbors) == 0:
                     raise AssertionError("No reachable neighbour from %s" % cur_cell)
@@ -344,16 +354,18 @@ class WilsonGenerate(GenerationAlgo):
                     for wall in path[loop_start + 1:]:
                         nc = wall.next_cell
                         in_path -= nc
-                        pen.update_cells(wall.next_cell, state=CellState.UNDISCOVERED)
+                        pen.paint_wall_path(wall, state=CellState.UNDISCOVERED)
 
                     cur_cell = path_start if loop_start < 0 else path[loop_start].next_cell
 
                     path[loop_start + 1:] = []  # erase loop, eg [a,b,c,d,b] becomes [a,b]
+                    forbidden_moves = ()
                 else:
                     in_path += next_cell
                     path.append(next_wall)
+                    forbidden_moves = (~next_wall.side,)
 
-                    pen.update_cells(next_cell, state=CellState.ACTIVE)
+                    pen.paint_wall_path(next_wall, state=CellState.ACTIVE)
 
                     cur_cell = next_cell
 
@@ -361,10 +373,10 @@ class WilsonGenerate(GenerationAlgo):
             # break walls separating items of the path
 
             for wall in path:
-                pen.update_cells(wall.cell, state=CellState.NORMAL)
                 maze.break_wall(wall, pen)
+                pen.paint_wall_path(wall, state=CellState.NORMAL)
 
-            pen.update_cells(cur_cell, state=CellState.NORMAL)
+            pen.update_cells(path_start, state=CellState.NORMAL)
 
             in_maze |= in_path
             in_path.setall(False)

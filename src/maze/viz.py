@@ -38,7 +38,7 @@ class Color(Enum):
     ORANGE = "orange"
     PURPLE = "purple"
     YELLOW = "yellow"
-    GREY = "grey"
+    GREY = "darkslategrey"
     BROWN = "brown"
 
 

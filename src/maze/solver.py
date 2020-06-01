@@ -112,6 +112,7 @@ class DfsSolver(SolverAlgo):
                 while len(stack) > 0 and len(walls) == 0:
                     (prev_wall, others) = stack.pop()
                     pen.paint_wall_path(prev_wall, state=CellState.IGNORED)
+                    pen.algo_tick(self)
 
                     walls = [w for w in others if w.next_cell not in visited]
 

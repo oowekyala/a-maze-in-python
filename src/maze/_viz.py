@@ -17,7 +17,7 @@ def conv_color(color: Color) -> pygame.Color:
 
 CELL_WIDTH = 5
 CELL_HEIGHT = CELL_WIDTH  # Cells are square
-MARGIN = 1  # Padding between cells
+MARGIN = 0  # Padding between cells
 
 CORRIDOR_COLOR = Color.WHITE
 WALL_COLOR = Color.BLACK
@@ -39,51 +39,78 @@ cell_colors[CellKind.WALL_ON] = {**cell_colors[CellKind.WALL_OFF], CellState.NOR
 
 
 
-class PyGamePen(GridPen):
+def _cell_rect(cell: Cell) -> pygame.Rect:
+    return _rect(2 * cell.x + 1, 2 * cell.y + 1)
 
-    def __init__(self, maze: Maze):
+
+
+def _wall_rect(wall: Wall) -> pygame.Rect:
+    ((x, y), side) = wall
+    (x, y) = (2 * x + 1, 2 * y + 1)
+    if side == Side.TOP:
+        x -= 1
+    elif side == Side.BOT:
+        x += 1
+    elif side == Side.LEFT:
+        y -= 1
+    elif side == Side.RIGHT:
+        y += 1
+
+    return _rect(x, y)
+
+
+
+def _rect(x, y) -> pygame.Rect:
+    return Rect(
+        (MARGIN + CELL_WIDTH) * y + MARGIN,
+        (MARGIN + CELL_HEIGHT) * x + MARGIN,
+        CELL_WIDTH,
+        CELL_HEIGHT
+    )
+
+
+
+class PyGamePen(GridPen):
+    """
+    Implementation of GridPen using pygame as a backend.
+    """
+
+
+    def __init__(self, maze: Maze, speed_factor: float = 1.0):
         super().__init__(maze)
         pygame.init()
         self.clock = pygame.time.Clock()
+        self.speed_factor = max(speed_factor, 0.1)  # this uses the custom setter
         self.__screen = PyGamePen.__size_window(maze)
         self.__cell_kind_map = {}
         self.reset_maze(maze)
 
 
-    @staticmethod
-    def _cell_rect(cell: Cell) -> pygame.Rect:
-        return PyGamePen.__rect(2 * cell.x + 1, 2 * cell.y + 1)
+    @property
+    def speed_factor(self):
+        return self.__speed_factor
 
 
-    @staticmethod
-    def _wall_rect(wall: Wall) -> pygame.Rect:
-        ((x, y), side) = wall
-        (x, y) = (2 * x + 1, 2 * y + 1)
-        if side == Side.TOP:
-            x -= 1
-        elif side == Side.BOT:
-            x += 1
-        elif side == Side.LEFT:
-            y -= 1
-        elif side == Side.RIGHT:
-            y += 1
+    @speed_factor.setter
+    def speed_factor(self, sf: float):
+        # A maze with many cells will show a higher framerate than a smaller maze for the same speed factor
+        # Otherwise some algorithms would be impossibly slow in big mazes
+        # The perceived "speed" depends on the algorithm
+        # Eg generation algos that solve one cell per tick (eg dfs, before i added ticks to the backtracks)
+        # will have a runtime proportional to the maze size
+        # The `// 10` below normalizes the execution time of these algos to 10 seconds, given a speed factor of 1
+        self.__speed_factor = max(sf, 0.01)
+        self.__algo_framerate = max(self.speed_factor * self.maze.num_cells // 10, 20)
 
-        return PyGamePen.__rect(x, y)
-
-
-    @staticmethod
-    def __rect(x, y) -> pygame.Rect:
-        return Rect(
-            (MARGIN + CELL_WIDTH) * y + MARGIN,
-            (MARGIN + CELL_HEIGHT) * x + MARGIN,
-            CELL_WIDTH,
-            CELL_HEIGHT
-        )
 
     def __single_update(self, rect: pygame.Rect, color: Color):
         pygame.draw.rect(self.__screen, conv_color(color), rect)
         pygame.display.update(rect)
         pygame.event.pump()
+
+
+    def algo_tick(self, algo_instance):
+        self.clock.tick(self.__algo_framerate)
 
 
     def update_walls(self,
@@ -97,9 +124,9 @@ class PyGamePen(GridPen):
 
 
         if len(walls) == 1:
-            self.__single_update(rect=PyGamePen._wall_rect(walls[0]), color=get_color(walls[0]))
+            self.__single_update(rect=_wall_rect(walls[0]), color=get_color(walls[0]))
         else:
-            self._batched_update(walls, get_color, get_rect=PyGamePen._wall_rect)
+            self._batched_update(walls, get_color, get_rect=_wall_rect)
 
 
     def update_cells(self, *cells: Cell, state: CellStateSelector, global_update: bool = False) -> None:
@@ -111,9 +138,9 @@ class PyGamePen(GridPen):
             return cell_colors[self.get_kind(cell)][s] if s else None
 
         if len(cells) == 1:
-            self.__single_update(rect=PyGamePen._cell_rect(cells[0]), color=get_color(cells[0]))
+            self.__single_update(rect=_cell_rect(cells[0]), color=get_color(cells[0]))
         else:
-            self._batched_update(cells, get_color, get_rect=PyGamePen._cell_rect)
+            self._batched_update(cells, get_color, get_rect=_cell_rect)
 
 
     T = TypeVar('T')
@@ -244,18 +271,18 @@ def loop(pen: GridPen):
 
 
 
-def launch(generator, solver, nrows, ncols, random_seed=random.randint(0, 100_000)):
+def launch(generator, solver, nrows, ncols, speed_factor: float = 1.0, random_seed=random.randint(0, 100_000)):
     maze = Maze(nrows=nrows, ncols=ncols, random_seed=random_seed)
     print("Maze seed: %d" % maze.random_seed)
-    pen = PyGamePen(maze)
+    pen = PyGamePen(maze, speed_factor=speed_factor)
     maze.apply_gen(generator, pen=pen)
     solver.solve(maze, pen)
     loop(pen)
 
 
 if __name__ == "__main__":
-    launch(generator=DfsGenerate(),
-           random_seed=87448,
+    launch(generator=WilsonGenerate(),
            solver=DfsSolver(),
-           nrows=80,
-           ncols=100)
+           speed_factor=1,
+           nrows=120,
+           ncols=190)
