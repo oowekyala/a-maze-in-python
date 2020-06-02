@@ -270,6 +270,7 @@ gen_map = {
 solver_map = {
     "DFS (Manhattan heuristic)": DfsSolver(heuristic=ManhattanDistance()),
     "DFS (no heuristic)": DfsSolver(heuristic=NoHeuristic()),
+    "BFS": BfsSolver(),
     "Right-hand rule": HandRuleSolver(is_right_hand_rule=True),
     "Left-hand rule": HandRuleSolver(is_right_hand_rule=False),
 }
@@ -375,6 +376,7 @@ class ControlPanel(object):
         if True:  # TODO
             solver = solver_map[self.solver_choicebox.get()]
             solver.solve(pygame_pen.maze, pygame_pen)
+
         pygame_pen.loop_until_exit()
 
 

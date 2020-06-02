@@ -132,6 +132,39 @@ class DfsSolver(SolverAlgo):
 
 
 
+
+class BfsSolver(SolverAlgo):
+
+    # TODO algo ticks in BFS should be one progress of the whole frontier
+
+    def solve(self, maze: Maze, pen: GridPen) -> None:
+
+        visited = maze.new_cell_set(False)
+        queue = []
+        cell = maze.start_cell
+
+        pen.update_cells(cell, state=CellState.ACTIVE)
+
+        while cell != maze.end_cell:
+            pen.algo_tick(self)
+            visited += cell
+
+            pen.update_cells(cell, state=CellState.IGNORED)
+
+            new_walls: List[Wall] = maze.walls_around(cell, only_passages=True, blacklist=visited)
+            queue.extend(new_walls)
+
+            pen.paint_wall_path(*new_walls, state=CellState.ACTIVE)
+
+            assert len(queue) > 0, "Unreachable end cell"
+            next_wall = queue.pop(0)
+
+            pen.update_walls(next_wall, state=CellState.IGNORED)
+            cell = next_wall.next_cell
+
+
+
+
 class HandRuleSolver(SolverAlgo):
 
     def __init__(self, is_right_hand_rule: bool = True):
