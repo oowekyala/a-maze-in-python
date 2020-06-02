@@ -365,6 +365,8 @@ class ControlPanel(object):
 
         def square_handler():
             is_square = self.square_grid_var.get()
+            # TODO either disable height slider ( `["state"] = tk.DISABLED` does not work properly)
+            #  or backsync height to width (see stash)
             if is_square:
                 self.height_slider.set(self.width_slider.get())
                 self.square_binding = self.width_slider.bind("<ButtonRelease-1>",
@@ -446,7 +448,3 @@ class ControlPanel(object):
 
         pygame_pen.loop_until_exit()
 
-
-
-if __name__ == "__main__":
-    control = ControlPanel()
