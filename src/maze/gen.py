@@ -159,10 +159,10 @@ class Maze(object):
         return res
 
 
-    def draw_regular_tiles(self, pen: GridPen) -> None:
+    def draw_regular_tiles(self, pen: GridPen, cell_state) -> None:
         """Draw walls & blanks, special tiles are added later. Only OFF walls need to be updated."""
 
-        pen.update_cells(*self.all_cells(), state=CellState.UNDISCOVERED, global_update=True)
+        pen.update_cells(*self.all_cells(), state=cell_state, global_update=True)
 
         ws = []
         for cell in self.all_cells():

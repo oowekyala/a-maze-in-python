@@ -33,22 +33,26 @@ cell_colors: Dict[CellKind, Dict[CellState, Color]] = {
 cell_colors[CellKind.WALL_OFF] = {**cell_colors[CellKind.REGULAR], CellState.UNDISCOVERED: WALL_COLOR}
 cell_colors[CellKind.WALL_ON] = {**cell_colors[CellKind.WALL_OFF], CellState.NORMAL: WALL_COLOR}
 
+
+
 class PyGamePen(GridPen):
     """
     Implementation of GridPen using pygame as a backend.
     """
 
 
-    def __init__(self, maze: Maze, speed_factor: float = 1.0, cell_width=6, cell_margin=0):
+    def __init__(self, maze: Maze, speed_factor: float = 1.0,
+                 tick_progress=None,
+                 cell_width=6, cell_margin=0):
         super().__init__(maze)
         pygame.init()
+        self.tick_progress = tick_progress
         self.clock = pygame.time.Clock()
         self.speed_factor = max(speed_factor, 0.1)  # this uses the custom setter
-        self.__screen = self.__size_window(maze)
-        self.__cell_kind_map = {}
-        self.progress = 0
         self.cell_width = cell_width
         self.cell_margin = cell_margin
+        self.__screen = self.__size_window(maze)
+        self.__cell_kind_map = {}
         self.reset_maze(maze)
 
 
@@ -112,10 +116,6 @@ class PyGamePen(GridPen):
         self.clock.tick(self.__algo_framerate)
 
 
-    def progress_tick(self, incr=1):
-        self.progress += incr
-
-
     def update_walls(self,
                      *walls: Wall,
                      state: CellState = CellState.NORMAL,
@@ -136,9 +136,11 @@ class PyGamePen(GridPen):
 
         sel = state_selector(state)
 
+
         def get_color(cell: Cell):
             s = sel(cell)
             return cell_colors[self.get_kind(cell)][s] if s else None
+
 
         if len(cells) == 1:
             self.__single_update(rect=self._cell_rect(cells[0]), color=get_color(cells[0]))
@@ -147,6 +149,7 @@ class PyGamePen(GridPen):
 
 
     T = TypeVar('T')
+
 
     def _batched_update(self,
                         cells: Iterable[T],
@@ -186,14 +189,14 @@ class PyGamePen(GridPen):
         prev_maze = self.maze
         super().reset_maze(maze)  # self.maze = maze
         if prev_maze is not maze:
-            self.__screen = PyGamePen.__size_window(maze)
+            self.__screen = self.__size_window(maze)
 
-        self.__draw_entire_maze(maze)
+        self.draw_entire_maze(cell_state=CellState.UNDISCOVERED)
 
 
-    def __draw_entire_maze(self, maze: Maze):
+    def draw_entire_maze(self, cell_state):
         self.__screen.fill(conv_color(WALL_COLOR))
-        maze.draw_regular_tiles(self)
+        self.maze.draw_regular_tiles(self, cell_state=cell_state)
         pygame.display.flip()
 
 
@@ -211,73 +214,42 @@ class PyGamePen(GridPen):
         return (2 * dim + 1) * (inc + self.cell_margin) + self.cell_margin * 2
 
 
+    def loop_until_exit(self):
+        while True:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    return None
 
-def get_mouse_cell(pen: PyGamePen):
-    # User moves the mouse. Get the position
-    pos = pygame.mouse.get_pos()
-
-    # Change the x/y screen coordinates to grid coordinates
-    column = pos[0] // (pen.cell_width + pen.cell_margin)
-    row = pos[1] // (pen.cell_height + pen.cell_margin)
-    return Cell(x=(row - 1) // 2, y=(column - 1) // 2)
+            self.clock.tick(30)
 
 
-# -------- Main Program Loop -----------
-def loop(pen: PyGamePen):
-    maze = pen.maze
-    dragged_kind = None
-    algo_was_run = False
-
-    while True:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                return None
-
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                clicked: Cell = get_mouse_cell()
-                # If click is inside grid
-                if clicked in maze and not algo_was_run:
-                    dragged_kind = pen.get_kind(clicked)
-
-            elif event.type == pygame.MOUSEBUTTONUP:
-                # Turn off all mouse drags if mouse Button released
-                dragged_kind = None
-
-            elif event.type == pygame.MOUSEMOTION:
-
-                # Boolean values saying whether left, middle and right mouse buttons are currently pressed
-                left, middle, right = pygame.mouse.get_pressed()
-
-                # Sometimes we get stuck in this loop if the mousebutton is released while not in the pygame screen
-                # This acts to break out of that loop
-                if not left:
-                    dragged_kind = None
-                    continue
-
-                mouse_cell: Cell = get_mouse_cell(pen)
-
-                # Turn mouse_drag off if mouse goes outside of grid
-                if mouse_cell not in maze:
-                    dragged_kind = None
-                    continue
-
-                if dragged_kind:
-                    pen.move_start_or_end(mouse_cell, dragged_kind)
-                    if algo_was_run:
-                        pen.reset_maze(maze)
-                        algo_was_run = False
-
-        pen.paint_everything()
+    def get_mouse_cell(self):
+        # User moves the mouse. Get the position
+        pos = pygame.mouse.get_pos()
+        # Change the x/y screen coordinates to grid coordinates
+        column = pos[0] // (self.cell_width + self.cell_margin)
+        row = pos[1] // (self.cell_height + self.cell_margin)
+        return Cell(x=(row - 1) // 2, y=(column - 1) // 2)
 
 
 
-def launch(generator, solver, nrows, ncols, speed_factor: float = 1.0, random_seed=random.randint(0, 100_000)):
+def generate(generator,
+             nrows,
+             ncols,
+             random_seed=random.randint(0, 100_000),
+             speed_factor: float = 1.0,
+             tick_progress=None,
+             visualize=True) -> PyGamePen:
     maze = Maze(nrows=nrows, ncols=ncols, random_seed=random_seed)
-    pen = PyGamePen(maze, speed_factor=speed_factor)
-    maze.apply_gen(generator, pen=pen)
-    solver.solve(maze, pen)
-    loop(pen)
+    pygame_pen = PyGamePen(maze, speed_factor=speed_factor, tick_progress=tick_progress)
+    if visualize:
+        maze.apply_gen(generator, pen=pygame_pen)
+    else:
+        maze.apply_gen(generator, pen=GridPen.noop_pen(maze, tick_progress=tick_progress))
+        pygame_pen.draw_entire_maze(cell_state=CellState.NORMAL)
+
+    return pygame_pen
 
 
 
@@ -353,6 +325,13 @@ class ControlPanel(object):
         self.generator_choicebox.grid(row=row, column=1, columnspan=2)
 
         row += 1
+        tk.Label(self.root, text="See generation?").grid(row=row)
+        self.visualize_gen_var = tk.BooleanVar(value=True)
+        self.visualize_checkbox = tk.Checkbutton(self.root, variable=self.visualize_gen_var, onvalue=True,
+                                                 offvalue=False)
+        self.visualize_checkbox.grid(row=row, column=1)
+
+        row += 1
         tk.Label(self.root, text="Solver").grid(row=row)
         self.solver_choicebox = ttk.Combobox(self.root, values=solvers_key_list)
         self.solver_choicebox.current(0)
@@ -366,21 +345,24 @@ class ControlPanel(object):
         go_button = tk.Button(self.root, text="Go", command=self.go_button_press, background="lightyellow")
         go_button.grid(row=row, columnspan=3)
 
-        row += 1
-        self.progress_bar = ttk.Progressbar(self.root, orient=tk.HORIZONTAL, length=100, mode='determinate')
-        self.progress_bar.grid(row=row, columnspan=3)
-
         self.root.mainloop()
 
 
     def go_button_press(self):
-        self.progress_bar["value"] = 0
-        launch(generator=gen_map[self.generator_choicebox.get()],
-               solver=solver_map[self.solver_choicebox.get()],
-               random_seed=int(self.seedvar.get()),
-               speed_factor=self.speed_slider.get() / 100,
-               nrows=int(self.height_slider.get()),
-               ncols=int(self.width_slider.get()))
+        pygame_pen = generate(
+            generator=gen_map[self.generator_choicebox.get()],
+            random_seed=int(self.seedvar.get()),
+            speed_factor=self.speed_slider.get() / 100,
+            nrows=int(self.height_slider.get()),
+            ncols=int(self.width_slider.get()),
+            visualize=self.visualize_gen_var.get(),
+        )
+
+        if True:  # TODO
+            solver = solver_map[self.solver_choicebox.get()]
+            solver.solve(pygame_pen.maze, pygame_pen)
+
+        pygame_pen.loop_until_exit()
 
 
 

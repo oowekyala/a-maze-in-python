@@ -83,16 +83,6 @@ class GridPen(metaclass=ABCMeta):
         """Record one step in the algorithm currently executing. This may be used to slow down some algorithms."""
         pass
 
-
-    def progress_tick(self, incr=1):
-        """Record one step in a generation algorithm. This is used to update the progress bar, when the generation
-        is not displayed but only the solving.
-
-        :param incr: Number of cells that have been solved
-        """
-        pass
-
-
     def paint_wall_path(self, *walls: Wall, state: CellState):
         self.update_cells(*[w.next_cell for w in walls], state=state)
         self.update_walls(*walls, state=state)
