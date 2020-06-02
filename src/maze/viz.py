@@ -131,12 +131,6 @@ class GridPen(metaclass=ABCMeta):
         }
 
 
-    @abstractmethod
-    def paint_everything(self):
-        """"""
-        pass
-
-
     @staticmethod
     def noop_pen(maze: 'Maze') -> 'GridPen':
         class __NoopPen(GridPen):
@@ -144,16 +138,15 @@ class GridPen(metaclass=ABCMeta):
             def __init__(self):
                 super().__init__(maze)
 
-
-            def paint_everything(self, *args, **kwargs):
-                pass
-
-
             def update_cells(self, *args, **kwargs) -> None:
                 pass
 
 
             def update_walls(self, *args, **kwargs) -> None:
+                pass
+
+
+            def paint_wall_path(self, *args, **kwargs) -> None:
                 pass
 
 

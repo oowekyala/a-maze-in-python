@@ -35,6 +35,13 @@ cell_colors[CellKind.WALL_ON] = {**cell_colors[CellKind.WALL_OFF], CellState.NOR
 
 
 
+class PyGameTermination(Exception):
+
+    def __init__(self):
+        pygame.quit()
+
+
+
 class PyGamePen(GridPen):
     """
     Implementation of GridPen using pygame as a backend.
@@ -42,13 +49,11 @@ class PyGamePen(GridPen):
 
 
     def __init__(self, maze: Maze, speed_factor: float = 1.0,
-                 tick_progress=None,
                  cell_width=6, cell_margin=0):
         super().__init__(maze)
         pygame.init()
-        self.tick_progress = tick_progress
         self.clock = pygame.time.Clock()
-        self.speed_factor = max(speed_factor, 0.1)  # this uses the custom setter
+        self.speed_factor = speed_factor  # this uses the custom setter
         self.cell_width = cell_width
         self.cell_margin = cell_margin
         self.__screen = self.__size_window(maze)
@@ -103,7 +108,15 @@ class PyGamePen(GridPen):
         # will have a runtime proportional to the maze size
         # The `// 10` below normalizes the execution time of these algos to 10 seconds, given a speed factor of 1
         self.__speed_factor = max(sf, 0.01)
-        self.__algo_framerate = max(self.speed_factor * self.maze.num_cells // 10, 20)
+        # Requirements, for any maze size:
+        # - at > 30% speed_factor, we want the framerate to be fluid (>= 20)
+        # - at the highest speed_factor, we want that any maze be generated in under 15 seconds (for linear generators)
+
+        if self.speed_factor <= .30:
+            self.__algo_framerate = self.speed_factor * 100
+        else:
+            self.__algo_framerate = max(self.speed_factor * self.maze.num_cells // 10, 20)
+        print(self.__algo_framerate)
 
 
     def __single_update(self, rect: pygame.Rect, color: Color):
@@ -114,6 +127,7 @@ class PyGamePen(GridPen):
 
     def algo_tick(self, algo_instance):
         self.clock.tick(self.__algo_framerate)
+        self.check_terminated()
 
 
     def update_walls(self,
@@ -179,12 +193,6 @@ class PyGamePen(GridPen):
             pygame.display.flip()
             pygame.event.pump()
 
-
-    def paint_everything(self):
-        pygame.display.flip()
-        self.clock.tick(60)  # limit to 60 fps
-
-
     def reset_maze(self, maze: Maze):
         prev_maze = self.maze
         super().reset_maze(maze)  # self.maze = maze
@@ -216,12 +224,13 @@ class PyGamePen(GridPen):
 
     def loop_until_exit(self):
         while True:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    pygame.quit()
-                    return None
-
+            self.check_terminated()
             self.clock.tick(30)
+
+
+    def check_terminated(self):
+        for event in pygame.event.get(eventtype=pygame.QUIT):
+            raise PyGameTermination()
 
 
     def get_mouse_cell(self):
@@ -239,14 +248,13 @@ def generate(generator,
              ncols,
              random_seed=random.randint(0, 100_000),
              speed_factor: float = 1.0,
-             tick_progress=None,
              visualize=True) -> PyGamePen:
     maze = Maze(nrows=nrows, ncols=ncols, random_seed=random_seed)
-    pygame_pen = PyGamePen(maze, speed_factor=speed_factor, tick_progress=tick_progress)
+    pygame_pen = PyGamePen(maze, speed_factor=speed_factor)
     if visualize:
         maze.apply_gen(generator, pen=pygame_pen)
     else:
-        maze.apply_gen(generator, pen=GridPen.noop_pen(maze, tick_progress=tick_progress))
+        maze.apply_gen(generator, pen=GridPen.noop_pen(maze))
         pygame_pen.draw_entire_maze(cell_state=CellState.NORMAL)
 
     return pygame_pen
@@ -325,17 +333,17 @@ class ControlPanel(object):
         self.generator_choicebox.grid(row=row, column=1, columnspan=2)
 
         row += 1
+        tk.Label(self.root, text="Solver").grid(row=row)
+        self.solver_choicebox = ttk.Combobox(self.root, values=solvers_key_list)
+        self.solver_choicebox.current(0)
+        self.solver_choicebox.grid(row=row, column=1, columnspan=2)
+
+        row += 1
         tk.Label(self.root, text="See generation?").grid(row=row)
         self.visualize_gen_var = tk.BooleanVar(value=True)
         self.visualize_checkbox = tk.Checkbutton(self.root, variable=self.visualize_gen_var, onvalue=True,
                                                  offvalue=False)
         self.visualize_checkbox.grid(row=row, column=1)
-
-        row += 1
-        tk.Label(self.root, text="Solver").grid(row=row)
-        self.solver_choicebox = ttk.Combobox(self.root, values=solvers_key_list)
-        self.solver_choicebox.current(0)
-        self.solver_choicebox.grid(row=row, column=1, columnspan=2)
 
         row += 1
         tk.Label(self.root, text="Speed").grid(row=row)
@@ -349,6 +357,13 @@ class ControlPanel(object):
 
 
     def go_button_press(self):
+        try:
+            self.launch_pygame()
+        except PyGameTermination:
+            pass
+
+
+    def launch_pygame(self):
         pygame_pen = generate(
             generator=gen_map[self.generator_choicebox.get()],
             random_seed=int(self.seedvar.get()),
@@ -357,11 +372,9 @@ class ControlPanel(object):
             ncols=int(self.width_slider.get()),
             visualize=self.visualize_gen_var.get(),
         )
-
         if True:  # TODO
             solver = solver_map[self.solver_choicebox.get()]
             solver.solve(pygame_pen.maze, pygame_pen)
-
         pygame_pen.loop_until_exit()
 
 
