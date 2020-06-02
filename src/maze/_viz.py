@@ -237,11 +237,11 @@ class PyGamePen(GridPen):
     def loop_until_exit(self):
         while True:
             self.check_terminated()
-            self.clock.tick(30)
+            self.clock.tick(60)
 
 
     def check_terminated(self):
-        for event in pygame.event.get(eventtype=pygame.QUIT):
+        if pygame.event.get(eventtype=pygame.QUIT):
             raise PyGameTermination()
 
 
