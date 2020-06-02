@@ -143,7 +143,7 @@ class BfsSolver(SolverAlgo):
         queue = []
         cell = maze.start_cell
 
-        pen.update_cells(cell, state=CellState.ACTIVE)
+        pen.update_cells(cell, state=CellState.BEST_PATH)
 
         while cell != maze.end_cell:
             pen.algo_tick(self)
@@ -154,7 +154,7 @@ class BfsSolver(SolverAlgo):
             new_walls: List[Wall] = maze.walls_around(cell, only_passages=True, blacklist=visited)
             queue.extend(new_walls)
 
-            pen.paint_wall_path(*new_walls, state=CellState.ACTIVE)
+            pen.paint_wall_path(*new_walls, state=CellState.BEST_PATH)
 
             assert len(queue) > 0, "Unreachable end cell"
             next_wall = queue.pop(0)

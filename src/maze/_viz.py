@@ -36,11 +36,7 @@ cell_colors[CellKind.WALL_ON] = {**cell_colors[CellKind.WALL_OFF], CellState.NOR
 
 
 class PyGameTermination(Exception):
-
-    def __init__(self):
-        pygame.quit()
-
-
+    pass
 
 class PyGamePen(GridPen):
     """
@@ -48,8 +44,10 @@ class PyGamePen(GridPen):
     """
 
 
-    def __init__(self, maze: Maze, speed_factor: float = 1.0,
-                 cell_width=6, cell_margin=0):
+    def __init__(self, maze: Maze,
+                 speed_factor: float = 1.0,
+                 cell_width=6,
+                 cell_margin=0):
         super().__init__(maze)
         pygame.init()
         self.clock = pygame.time.Clock()
@@ -194,7 +192,7 @@ class PyGamePen(GridPen):
             pygame.event.pump()
 
     def reset_maze(self, maze: Maze):
-        prev_maze = self.maze
+        prev_maze: Maze = self.maze
         super().reset_maze(maze)  # self.maze = maze
         if prev_maze is not maze:
             self.__screen = self.__size_window(maze)
@@ -204,8 +202,11 @@ class PyGamePen(GridPen):
 
     def draw_entire_maze(self, cell_state):
         self.__screen.fill(conv_color(WALL_COLOR))
-        self.maze.draw_regular_tiles(self, cell_state=cell_state)
-        pygame.display.flip()
+
+        self.update_cells(*self.maze.all_cells(), state=cell_state, global_update=True)
+
+        if self.maze.mod_count != 0:
+            self.update_walls(*self.maze.distinct_off_walls(), global_update=True)
 
 
     def __size_window(self, maze: Maze) -> pygame.Surface:
@@ -247,14 +248,15 @@ def generate(generator,
              nrows,
              ncols,
              random_seed=random.randint(0, 100_000),
+             cell_width=6,
              speed_factor: float = 1.0,
              visualize=True) -> PyGamePen:
     maze = Maze(nrows=nrows, ncols=ncols, random_seed=random_seed)
-    pygame_pen = PyGamePen(maze, speed_factor=speed_factor)
+    pygame_pen = PyGamePen(maze, speed_factor=speed_factor, cell_width=cell_width)
     if visualize:
-        maze.apply_gen(generator, pen=pygame_pen)
+        apply_gen(generator, pen=pygame_pen)
     else:
-        maze.apply_gen(generator, pen=GridPen.noop_pen(maze))
+        apply_gen(generator, pen=GridPen.noop_pen(maze))
         pygame_pen.draw_entire_maze(cell_state=CellState.NORMAL)
 
     return pygame_pen
@@ -291,64 +293,95 @@ class ControlPanel(object):
         self.root = tk.Tk()
 
 
-        def slider(label, from_, to, default, row, unit=""):
+        def row_label(text: str):
+            ttk.Label(self.root, text=text, anchor="w").grid(row=row, column=0)
+
+
+        def slider(label_text, from_, to, default, unit=""):
             assert from_ <= default <= to
 
-            tk.Label(self.root, text=label).grid(row=row)
+            row_label(text=label_text)
 
-            label = tk.Label(self.root, text=str(default))
+            value_label = tk.Label(self.root, text=str(default))
             scale = None
 
 
             def update(event):
-                label["text"] = "%d%s" % (scale.get(), unit)
+                value_label["text"] = "%d%s" % (scale.get(), unit)
 
 
-            scale = ttk.Scale(self.root, from_=from_, to=to, orient=tk.HORIZONTAL, command=update)
+            scale = tk.Scale(self.root, from_=from_, to=to, orient=tk.HORIZONTAL, command=update, showvalue=False)
 
             scale.setvar("command", update)
 
             scale.set(default)
 
-            label.grid(row=row, column=1)
+            value_label.grid(row=row, column=1)
             scale.grid(row=row, column=2)
             return scale
 
 
+        def checkbox(label_text, default=True, on_change=None):
+            row_label(label_text)
+            var = tk.BooleanVar(value=default)
+            cbox = tk.Checkbutton(self.root, variable=var, onvalue=True, offvalue=False, command=on_change)
+            cbox.grid(row=row, column=1)
+            return var
+
+
         row = 0
-        self.width_slider = slider(label="Width", from_=5, to=120, default=50, row=row)
+        self.width_slider = slider(label_text="Width", from_=5, to=300, default=50)
 
         row += 1
-        self.height_slider = slider(label="Height", from_=5, to=120, default=50, row=row)
+        self.height_slider = slider(label_text="Height", from_=5, to=300, default=50)
 
         row += 1
-        tk.Label(self.root, text="Seed").grid(row=row)
+
+        self.square_binding = None
+
+
+        def square_handler():
+            is_square = self.square_grid_var.get()
+            if is_square:
+                self.height_slider.set(self.width_slider.get())
+                self.square_binding = self.width_slider.bind("<ButtonRelease-1>",
+                                                             lambda e: self.height_slider.set(self.width_slider.get()))
+            elif self.square_binding:
+                self.width_slider.unbind("<ButtonRelease-1>", funcid=self.square_binding)
+                self.square_binding = None
+
+
+        self.square_grid_var = checkbox("Square", on_change=square_handler)
+        square_handler()
+
+        row += 1
+        self.cell_width_slider = slider(label_text="Cell size", from_=3, to=15, default=6)
+
+        row += 1
+        row_label(text="Seed")
         self.seedvar = tk.StringVar(value=str(random.randrange(0, 100_000)))
-        self.seed_entry = tk.Entry(self.root, textvariable=self.seedvar)
+        self.seed_entry = ttk.Entry(self.root, textvariable=self.seedvar)
         self.seed_entry.grid(row=row, column=1, columnspan=2)
 
         row += 1
-        tk.Label(self.root, text="Generator").grid(row=row)
+        row_label(text="Generator")
         self.generator_choicebox = ttk.Combobox(self.root, values=gen_key_list)
         self.generator_choicebox.current(0)
         self.generator_choicebox.grid(row=row, column=1, columnspan=2)
 
         row += 1
-        tk.Label(self.root, text="Solver").grid(row=row)
+        row_label(text="Solver")
         self.solver_choicebox = ttk.Combobox(self.root, values=solvers_key_list)
         self.solver_choicebox.current(0)
         self.solver_choicebox.grid(row=row, column=1, columnspan=2)
 
         row += 1
-        tk.Label(self.root, text="See generation?").grid(row=row)
-        self.visualize_gen_var = tk.BooleanVar(value=True)
-        self.visualize_checkbox = tk.Checkbutton(self.root, variable=self.visualize_gen_var, onvalue=True,
-                                                 offvalue=False)
-        self.visualize_checkbox.grid(row=row, column=1)
+        row_label(text="See generation?")
+        self.visualize_gen_var = checkbox(label_text="See generation?", default=True)
 
         row += 1
-        tk.Label(self.root, text="Speed").grid(row=row)
-        self.speed_slider = slider(label="Speed", from_=1, to=100, default=100, row=row, unit=" %")
+        row_label(text="Speed")
+        self.speed_slider = slider(label_text="Speed", from_=1, to=100, default=100, unit=" %")
 
         row += 1
         go_button = tk.Button(self.root, text="Go", command=self.go_button_press, background="lightyellow")
@@ -361,7 +394,7 @@ class ControlPanel(object):
         try:
             self.launch_pygame()
         except PyGameTermination:
-            pass
+            pygame.quit()
 
 
     def launch_pygame(self):
@@ -372,6 +405,7 @@ class ControlPanel(object):
             nrows=int(self.height_slider.get()),
             ncols=int(self.width_slider.get()),
             visualize=self.visualize_gen_var.get(),
+            cell_width=int(self.cell_width_slider.get()),
         )
         if True:  # TODO
             solver = solver_map[self.solver_choicebox.get()]

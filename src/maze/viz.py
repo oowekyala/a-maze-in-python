@@ -1,7 +1,6 @@
 from abc import abstractmethod, ABCMeta
 from typing import Callable, Dict, TypeVar
 from enum import Enum, auto, unique
-import time
 from maze.model import *
 
 
@@ -61,7 +60,7 @@ def state_selector(state: StateSelector[C]) -> Callable[[C], Optional[CellState]
 
 class GridPen(metaclass=ABCMeta):
 
-    def __init__(self, maze: 'Maze'):
+    def __init__(self, maze: Maze):
         self.__maze = maze
         self.__cell_kind_map = {}
         self.__reset_kind_map()
@@ -116,7 +115,7 @@ class GridPen(metaclass=ABCMeta):
         return self.__cell_kind_map.get(cell, CellKind.REGULAR)
 
 
-    def reset_maze(self, maze: 'Maze'):
+    def reset_maze(self, maze: Maze):
         """Repaint the whole grid, the maze may have different dimensions (resize window)"""
         self.__maze = maze
         self.__reset_kind_map()
@@ -132,7 +131,7 @@ class GridPen(metaclass=ABCMeta):
 
 
     @staticmethod
-    def noop_pen(maze: 'Maze') -> 'GridPen':
+    def noop_pen(maze: Maze) -> 'GridPen':
         class __NoopPen(GridPen):
 
             def __init__(self):
@@ -148,6 +147,5 @@ class GridPen(metaclass=ABCMeta):
 
             def paint_wall_path(self, *args, **kwargs) -> None:
                 pass
-
 
         return __NoopPen()

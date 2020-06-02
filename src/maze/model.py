@@ -4,7 +4,7 @@ from typing import NamedTuple, Optional, Union, Iterable
 from bitarray import bitarray
 from bitarray.util import rindex
 from copy import copy
-
+from random import Random
 
 
 @unique
@@ -195,10 +195,180 @@ class Wall(NamedTuple):
     def next_cell(self):
         return self.cell.next(side=self.side)
 
+
     @property
     def x(self):
         return self.cell.x
 
+
     @property
     def y(self):
         return self.cell.y
+
+
+
+class Maze(object):
+    """A maze with fixed-dimensions. Cells are either walled or free. Initially all cells are walled.
+       apply_gen generates corridors by breaking some walls
+
+            y
+       ------->
+       |
+      x|
+       v
+       """
+
+
+    def __init__(self, nrows: int, ncols: int, random_seed: int):
+        if nrows <= 0 or ncols <= 0:
+            raise AssertionError("Dimensions must be >= 0, got %d, %d" % (nrows, ncols))
+
+        self.__size = nrows * ncols
+        self.__nrows = nrows
+        self.__ncols = ncols
+
+        self.mod_count = 0
+
+        self.random = Random(random_seed)
+        self.random_seed = random_seed
+
+        self.start_cell = Cell(0, 0)
+        self.end_cell = Cell(x=self.height - 1, y=self.width - 1)
+
+        # 2 bitarrays: 1 for TOP walls, one for LEFT ones
+        # All walls are set
+        self.__walls = self.__wall_map()
+
+        self.reset()
+
+
+    def __wall_map(self):
+        return {
+            Side.TOP: self.new_cell_set(initial_value=True),
+            Side.LEFT: self.new_cell_set(initial_value=True),
+        }
+
+
+    def rand_cell(self):
+        """Generate a random cell in this maze"""
+        return Cell(x=self.random.randrange(0, self.height),
+                    y=self.random.randrange(0, self.width))
+
+
+    def reset(self):
+        if self.mod_count == 0:
+            return None
+
+        self.__walls = self.__wall_map()
+        self.mod_count = 0
+
+
+    def new_cell_set(self, initial_value: bool = False) -> Cell.CellSet:
+        return Cell.CellSet.with_initial(height=self.height, width=self.width, initial_value=initial_value)
+
+
+    def walls_around(self, cell: Cell, except_sides: Iterable[Side] = (), only_passages=False, blacklist=None):
+        return [w
+                for s in list(Side)
+                if s not in except_sides
+                for w in [cell.wall(s)]
+                if w.next_cell in self
+                if (not only_passages) or (not self.has_wall(w))
+                if (not blacklist or w.next_cell not in blacklist)]
+
+
+    @property
+    def height(self) -> int:
+        """Number of rows, ie height, ie max value (exclusive) of the x coordinate of a Cell"""
+        return self.__nrows
+
+
+    @property
+    def width(self) -> int:
+        """Number of columns, ie width, ie max value (exclusive) of the y coordinate of a Cell"""
+        return self.__ncols
+
+
+    @property
+    def num_cells(self) -> int:
+        """Number of cells in the maze"""
+        return self.__size
+
+
+    def has_wall(self, wall: Wall) -> bool:
+        """True if the wall exists, false if not. Throws IndexError if cell is out-of-bounds."""
+        self.__check_pos(wall.cell)
+        if wall.next_cell not in self:
+            return True
+
+        (cell, side) = wall
+
+        if side == Side.RIGHT or side == Side.BOT:
+            return wall.next_cell in self.__walls[~side]
+        else:
+            return cell in self.__walls[side]
+
+
+    def set_wall(self, wall: Wall, is_present: bool = True) -> None:
+        """Set the given wall, or unsets it. Boundaries of the maze cannot be set."""
+        self.__check_pos(wall.cell)
+        if wall.next_cell not in self:
+            return None
+
+        (cell, side) = wall
+
+        if side == Side.RIGHT or side == Side.BOT:
+            self.__walls[~side][wall.next_cell] = is_present
+        else:
+            self.__walls[side][cell] = is_present
+
+        self.mod_count += 1
+
+
+    def __check_pos(self, cell: Cell) -> None:
+        if cell not in self:
+            raise IndexError(cell)
+
+
+    def __contains__(self, cell: Cell) -> bool:
+        return 0 <= cell.x < self.height \
+               and 0 <= cell.y < self.width
+
+
+    def all_cells(self, from_cell=None):
+        return Cell.iterate(from_cell=from_cell, h=self.height, w=self.width)
+
+
+    def __str__(self):
+        res = ""
+        for x in range(0, self.height):
+            hline = "   "
+            vline = "   "
+
+            for y in range(0, self.width):
+                cell = Cell(x, y)
+                has_top = cell in self.__walls[Side.TOP]
+                has_left = cell in self.__walls[Side.LEFT]
+                hline += "+--" if has_top else "+  "
+                vline += "|" if has_left else " "
+                vline += "<>" if self.start_cell == cell \
+                    else "><" if self.end_cell == cell \
+                    else "  "
+
+            res += hline + "+\n"
+            res += vline + "|\n"
+
+        res += "   "
+        res += ("+--" * self.width)
+        res += "+"
+        return res
+
+
+    def distinct_off_walls(self) -> Iterable[Wall]:
+        for cell in self.all_cells():
+
+            if cell not in self.__walls[Side.TOP]:
+                yield cell.wall(Side.TOP)
+
+            if cell not in self.__walls[Side.LEFT]:
+                yield cell.wall(Side.LEFT)
