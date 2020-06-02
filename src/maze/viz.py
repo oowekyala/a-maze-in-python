@@ -78,7 +78,7 @@ class GridPen(metaclass=ABCMeta):
         pass
 
 
-    def algo_tick(self, algo_instance):
+    def algo_tick(self, algo_instance, frontier_size=1):
         """Record one step in the algorithm currently executing. This may be used to slow down some algorithms."""
         pass
 

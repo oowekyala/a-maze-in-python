@@ -1,7 +1,5 @@
 from maze.model import *
-from maze.gen import *
 from maze.viz import *
-import random, time
 from random import Random
 from typing import Callable, List, Tuple
 from abc import abstractmethod, ABCMeta
@@ -81,6 +79,7 @@ class ShuffleHeuristic(Heuristic):
     def __init__(self, seed: Optional[int] = None):
         self.random = Random(x=seed)
 
+
     def pick_path(self, maze: Maze, cell: Cell, walls: List[Wall]) -> (Wall, List[Wall]):
         i = self.random.randrange(0, len(walls))
         return walls.pop(i), walls
@@ -132,36 +131,42 @@ class DfsSolver(SolverAlgo):
 
 
 
-
 class BfsSolver(SolverAlgo):
-
-    # TODO algo ticks in BFS should be one progress of the whole frontier
 
     def solve(self, maze: Maze, pen: GridPen) -> None:
 
         visited = maze.new_cell_set(False)
         queue = []
+        queue2 = []
         cell = maze.start_cell
 
         pen.update_cells(cell, state=CellState.BEST_PATH)
 
         while cell != maze.end_cell:
-            pen.algo_tick(self)
             visited += cell
 
             pen.update_cells(cell, state=CellState.IGNORED)
 
             new_walls: List[Wall] = maze.walls_around(cell, only_passages=True, blacklist=visited)
-            queue.extend(new_walls)
+            queue2.extend(new_walls)
 
             pen.paint_wall_path(*new_walls, state=CellState.BEST_PATH)
 
-            assert len(queue) > 0, "Unreachable end cell"
+            if len(queue) == 0:
+                assert len(queue2) > 0, "Unreachable end cell"
+
+                # swap queues
+                tmp = queue
+                queue = queue2
+                queue2 = tmp
+
+                # algo ticks correspond to one step of the whole frontier
+                pen.algo_tick(self)
+
             next_wall = queue.pop(0)
 
             pen.update_walls(next_wall, state=CellState.IGNORED)
             cell = next_wall.next_cell
-
 
 
 

@@ -76,7 +76,7 @@ class PrimGenerate(GenerationAlgo):
             else:
                 pen.update_walls(wall)  # Remove ACTIVE status
 
-            pen.algo_tick(self)
+            pen.algo_tick(self, frontier_size=len(walls))
 
 
 

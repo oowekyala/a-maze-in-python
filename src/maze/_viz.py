@@ -3,6 +3,8 @@ from typing import Dict
 from pygame import Rect
 import pygame
 
+import random
+
 from maze.viz import *
 from maze.gen import *
 from maze.solver import *
@@ -123,8 +125,17 @@ class PyGamePen(GridPen):
         pygame.event.pump()
 
 
-    def algo_tick(self, algo_instance):
-        self.clock.tick(self.__algo_framerate)
+    def algo_tick(self, algo_instance, frontier_size=1):
+        frontier_size = max(frontier_size, 1)
+        tick_weight = 1
+        if frontier_size != 1 and frontier_size / self.maze.num_cells >= 0.02:
+            #  algo_tick slows down BFS-type algorithms (eg Prim), where the algo advances a whole
+            #  frontier. A tick is registered for each member of the frontier, so as the frontier grows,
+            #  it hits the framerate limit much earlier than algos like DFS, which have a single cell as
+            #  frontier
+
+            tick_weight = 5
+        self.clock.tick(tick_weight * self.__algo_framerate)
         self.check_terminated()
 
 
@@ -359,9 +370,19 @@ class ControlPanel(object):
 
         row += 1
         row_label(text="Seed")
-        self.seedvar = tk.StringVar(value=str(random.randrange(0, 100_000)))
+
+        self.seedvar = tk.StringVar()
+
+
+        def gen_seed():
+            return self.seedvar.set(str(random.randrange(0, 100_000)))
+
+
+        gen_seed()
+        tk.Button(text="gen", padx=3, pady=3, command=gen_seed).grid(row=row, column=1)
+
         self.seed_entry = ttk.Entry(self.root, textvariable=self.seedvar)
-        self.seed_entry.grid(row=row, column=1, columnspan=2)
+        self.seed_entry.grid(row=row, column=2)
 
         row += 1
         row_label(text="Generator")
