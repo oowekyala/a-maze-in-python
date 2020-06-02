@@ -71,6 +71,7 @@ class GridPen(metaclass=ABCMeta):
     def maze(self):
         return self.__maze
 
+
     def update_walls(self,
                      *walls: Wall,
                      state: CellState = CellState.NORMAL,
@@ -83,9 +84,19 @@ class GridPen(metaclass=ABCMeta):
         pass
 
 
+    def progress_tick(self, incr=1):
+        """Record one step in a generation algorithm. This is used to update the progress bar, when the generation
+        is not displayed but only the solving.
+
+        :param incr: Number of cells that have been solved
+        """
+        pass
+
+
     def paint_wall_path(self, *walls: Wall, state: CellState):
         self.update_cells(*[w.next_cell for w in walls], state=state)
         self.update_walls(*walls, state=state)
+
 
     def update_cells(self, *cells: Cell, state: CellStateSelector, global_update: bool = False) -> None:
         """Batch update"""
