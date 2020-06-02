@@ -26,21 +26,6 @@ class CellKind(Enum):
     WALL_ON = auto()
     WALL_OFF = auto()
 
-
-@unique
-class Color(Enum):
-    BLACK = "black"
-    WHITE = "white"
-    GREEN = "green"
-    RED = "red"
-    BLUE = "blue"
-    ORANGE = "orange"
-    PURPLE = "purple"
-    YELLOW = "yellow"
-    GREY = "darkslategrey"
-    BROWN = "brown"
-
-
 C = TypeVar('C', Cell, Wall)
 StateSelector = Union[CellState, Callable[[C], Optional[CellState]], Dict[C, (CellState)]]
 

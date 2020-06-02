@@ -10,10 +10,22 @@ from maze.gen import *
 from maze.solver import *
 from maze.model import *
 
+@unique
+class Color(Enum):
+    BLACK = pygame.Color("black")
+    WHITE = pygame.Color("white")
+    GREEN = pygame.Color(133, 223, 38)
+    RED = pygame.Color("red")
+    BLUE = pygame.Color(5, 103, 173)
+    ORANGE = pygame.Color("orange")
+    PURPLE = pygame.Color("purple")
+    YELLOW = pygame.Color(237, 207, 84)
+    GREY = pygame.Color("darkslategrey")
+    BROWN = pygame.Color("brown")
 
 
 def conv_color(color: Color) -> pygame.Color:
-    return pygame.Color(color.value)
+    return color.value
 
 
 
