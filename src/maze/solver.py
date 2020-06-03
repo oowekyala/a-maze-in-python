@@ -161,7 +161,7 @@ class BfsSolver(SolverAlgo):
                 queue2 = tmp
 
                 # algo ticks correspond to one step of the whole frontier
-            pen.algo_tick(self)
+                pen.algo_tick(self)
 
             next_wall = queue.pop(0)
 

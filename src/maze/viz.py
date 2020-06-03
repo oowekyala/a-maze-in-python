@@ -101,9 +101,14 @@ class GridPen(metaclass=ABCMeta):
 
 
     def reset_maze(self, maze: Maze):
-        """Repaint the whole grid, the maze may have different dimensions (resize window)"""
+        """Change the maze, it may have different dimensions (resize window)"""
         self.__maze = maze
         self.__reset_kind_map()
+
+
+    def draw_entire_maze(self, cell_state: CellState, is_walled: bool = True):
+        """Repaint the whole grid."""
+        pass
 
 
     def __reset_kind_map(self):

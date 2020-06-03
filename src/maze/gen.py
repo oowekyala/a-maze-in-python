@@ -1,18 +1,32 @@
 from abc import abstractmethod, ABCMeta
-from typing import List
+from typing import List, NamedTuple
+from enum import Enum, auto
 
 from maze.viz import *
 
 
 
+class StartState(Enum):
+    WALLED = auto()
+    CLEAR = auto()
+
+
 
 class GenerationAlgo(metaclass=ABCMeta):
+
+    def start_state(self) -> StartState:
+        """The state the algorithm should start in.
+            WALLED: all walls are set, the algorithm's job is to break walls
+            CLEAR: no walls are set, the algorithm's job is to create walls
+        """
+        return StartState.WALLED
+
 
     @abstractmethod
     def generate(self, pen: GridPen) -> None:
         """
         Generate the maze by breaking some walls. Initially all walls are
-        set.
+        set or unset, according to the start_state.
 
         :param pen:             Pen to draw the generation (contains the maze)
         """
@@ -21,15 +35,114 @@ class GenerationAlgo(metaclass=ABCMeta):
 
 
 def apply_gen(gen: GenerationAlgo, pen: GridPen):
-    pen.maze.reset()
+    is_walled = gen.start_state() == StartState.WALLED
+    state = CellState.UNDISCOVERED if is_walled else CellState.NORMAL
+
+    pen.maze.reset(walls_on=is_walled)
     pen.reset_maze(maze=pen.maze)
+    pen.draw_entire_maze(cell_state=state, is_walled=is_walled)
+
     gen.generate(pen=pen)
 
 
 
 def _break_wall(wall: Wall, pen: GridPen):
-    pen.maze.set_wall(wall, is_present=False)
+    pen.maze.set_walls(wall, is_present=False)
     pen.update_walls(wall)
+
+
+
+class Chamber(NamedTuple):
+    """A rectangular region of a maze"""
+
+    top_left: Cell  # inclusive
+    bot_right: Cell  # inclusive
+
+
+    @property
+    def width(self):
+        return self.bot_right.y - self.top_left.y + 1
+
+
+    @property
+    def height(self):
+        return self.bot_right.x - self.top_left.x + 1
+
+
+    @property
+    def is_unit(self):
+        return self.height < 2 or self.width < 2
+
+
+    def border_wall(self, side: Side) -> List[Wall]:
+        """Returns the range of walls bordering this chamber on a particular side"""
+        if side == Side.RIGHT or side == Side.LEFT:
+            const_y = self.bot_right.y if side == Side.RIGHT else self.top_left.y
+
+            return [Wall(Cell(x, const_y), side) for x in range(self.top_left.x, self.bot_right.x + 1)]
+        else:
+            const_x = self.bot_right.x if side == Side.BOT else self.top_left.x
+
+            return [Wall(Cell(const_x, y), side) for y in range(self.top_left.y, self.bot_right.y + 1)]
+
+
+class RecursiveDivisionGenerate(GenerationAlgo):
+
+    def start_state(self) -> StartState:
+        return StartState.CLEAR
+
+
+    def divide(self, pen: GridPen, chamber: Chamber, x_divider: int, y_divider: int) -> Iterable[Chamber]:
+        """Trace two walls dividing the chamber, return the four subchambers"""
+
+        top_left =  Chamber(chamber.top_left,                            Cell(x=x_divider, y=y_divider))
+        top_right = Chamber(Cell(x=chamber.top_left.x, y=y_divider + 1), Cell(x=x_divider, y=chamber.bot_right.y))
+        bot_right = Chamber(Cell(x=x_divider + 1, y=y_divider + 1),      chamber.bot_right)
+        bot_left =  Chamber(Cell(x=x_divider + 1, y=chamber.top_left.y), Cell(x=chamber.bot_right.x, y=y_divider))
+
+        new_walls = [
+            top_right.border_wall(Side.LEFT),
+            bot_right.border_wall(Side.LEFT),
+
+            bot_left.border_wall(Side.TOP),
+            bot_right.border_wall(Side.TOP),
+        ]
+
+        random = pen.maze.random
+
+        # cut out 3 passages out of 4 (remove one of the walls)
+        for wall_range in random.sample(new_walls, 3):
+            wall_range.pop(random.randrange(0, len(wall_range)))
+
+        for walls in new_walls:
+            pen.maze.set_walls(*walls, is_present=True)
+            pen.update_walls(*walls)
+            pen.algo_tick(self)
+
+        return [top_left, top_right, bot_right, bot_left]
+
+
+    def generate(self, pen: GridPen) -> None:
+        maze = pen.maze
+
+
+        def cut(c1: int, c2: int):
+            return (c1 + c2) // 2  # could use random
+
+
+        chambers = [Chamber(Cell(0, 0), Cell(x=maze.height - 1, y=maze.width - 1))]
+
+        while len(chambers) > 0:
+
+            chamber = chambers.pop()
+
+            if chamber.is_unit:
+                continue
+
+            wall_x = cut(chamber.top_left.x, chamber.bot_right.x)
+            wall_y = cut(chamber.top_left.y, chamber.bot_right.y)
+
+            chambers.extend(self.divide(pen=pen, chamber=chamber, x_divider=wall_x, y_divider=wall_y))
 
 
 
@@ -130,6 +243,10 @@ class WilsonGenerate(GenerationAlgo):
     Wilson's algorithm, to generate unbiased random mazes.
 
     https://en.wikipedia.org/wiki/Maze_generation_algorithm#Wilson's_algorithm
+
+
+    TODO an interesting idea would be to have two random walks at the same time
+
     """
 
 
@@ -140,19 +257,9 @@ class WilsonGenerate(GenerationAlgo):
         in_path: Cell.CellSet = maze.new_cell_set(False)
 
         seed = maze.rand_cell()
-        in_maze += seed  # TODO seed should be bound to the random source
+        in_maze += seed
 
         pen.update_cells(seed, state=CellState.NORMAL)
-
-        # TODO add seeds. Problem is, each seed forms an independent mazes
-        # seeds = [seed]
-        # for i in range((maze.width * maze.height) // (50 * 50)):
-        #     # big maze, add seeds
-        #     seed = maze.rand_cell()
-        #     in_maze += seed
-        #     seeds.append(seed)
-        #
-        # pen.update_cells(*seeds, state=CellState.NORMAL)
 
         last_cell = Cell(0, 0)
 

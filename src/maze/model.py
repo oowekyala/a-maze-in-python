@@ -237,10 +237,10 @@ class Maze(object):
 
         # 2 bitarrays: 1 for TOP walls, one for LEFT ones
         # All walls are set
-        self.__walls = self.__wall_map()
-
-        self.reset()
-
+        self.__walls = {
+            Side.TOP: self.new_cell_set(initial_value=True),
+            Side.LEFT: self.new_cell_set(initial_value=True),
+        }
 
     def __wall_map(self):
         return {
@@ -255,12 +255,9 @@ class Maze(object):
                     y=self.random.randrange(0, self.width))
 
 
-    def reset(self):
-        if self.mod_count == 0:
-            return None
-
-        self.__walls = self.__wall_map()
-        self.mod_count = 0
+    def reset(self, walls_on: bool):
+        for wall_set in self.__walls.values():
+            wall_set.setall(walls_on)
 
 
     def new_cell_set(self, initial_value: bool = False) -> Cell.CellSet:
@@ -309,20 +306,21 @@ class Maze(object):
             return cell in self.__walls[side]
 
 
-    def set_wall(self, wall: Wall, is_present: bool = True) -> None:
-        """Set the given wall, or unsets it. Boundaries of the maze cannot be set."""
-        self.__check_pos(wall.cell)
-        if wall.next_cell not in self:
-            return None
+    def set_walls(self, *walls: Wall, is_present: bool = True) -> None:
+        """Set the given walls, or unsets them. Boundaries of the maze cannot be set."""
+        for wall in walls:
+            self.__check_pos(wall.cell)
+            if wall.next_cell not in self:
+                return None
 
-        (cell, side) = wall
+            (cell, side) = wall
 
-        if side == Side.RIGHT or side == Side.BOT:
-            self.__walls[~side][wall.next_cell] = is_present
-        else:
-            self.__walls[side][cell] = is_present
+            if side == Side.RIGHT or side == Side.BOT:
+                self.__walls[~side][wall.next_cell] = is_present
+            else:
+                self.__walls[side][cell] = is_present
 
-        self.mod_count += 1
+        self.mod_count += len(walls)
 
 
     def __check_pos(self, cell: Cell) -> None:
@@ -364,11 +362,14 @@ class Maze(object):
         return res
 
 
-    def distinct_off_walls(self) -> Iterable[Wall]:
+    def distinct_walls(self, on: bool) -> Iterable[Wall]:
+        """
+        Return all distinct walls that are either on or off, depending on the parameter 'on'
+        """
         for cell in self.all_cells():
 
-            if cell not in self.__walls[Side.TOP]:
+            if on == (cell in self.__walls[Side.TOP]):
                 yield cell.wall(Side.TOP)
 
-            if cell not in self.__walls[Side.LEFT]:
+            if on == (cell in self.__walls[Side.LEFT]):
                 yield cell.wall(Side.LEFT)

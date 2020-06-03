@@ -64,6 +64,8 @@ class PyGamePen(GridPen):
                  cell_margin=0):
         super().__init__(maze)
         pygame.init()
+        pygame.display.set_caption("A maze")
+
         self.clock = pygame.time.Clock()
         self.speed_factor = speed_factor  # this uses the custom setter
         self.cell_width = cell_width
@@ -125,7 +127,6 @@ class PyGamePen(GridPen):
             self.__algo_framerate = self.speed_factor * 100
         else:
             self.__algo_framerate = max(self.speed_factor * self.maze.num_cells // 10, 20)
-        print(self.__algo_framerate)
 
 
     def __single_update(self, rect: pygame.Rect, color: Color):
@@ -211,22 +212,21 @@ class PyGamePen(GridPen):
             pygame.display.flip()
             pygame.event.pump()
 
+
     def reset_maze(self, maze: Maze):
         prev_maze: Maze = self.maze
         super().reset_maze(maze)  # self.maze = maze
         if prev_maze is not maze:
             self.__screen = self.__size_window(maze)
 
-        self.draw_entire_maze(cell_state=CellState.UNDISCOVERED)
 
-
-    def draw_entire_maze(self, cell_state):
+    def draw_entire_maze(self, cell_state: CellState, is_walled: bool = True):
         self.__screen.fill(conv_color(WALL_COLOR))
 
         self.update_cells(*self.maze.all_cells(), state=cell_state, global_update=True)
 
-        if self.maze.mod_count != 0:
-            self.update_walls(*self.maze.distinct_off_walls(), global_update=True)
+        if self.maze.mod_count != 0 or not is_walled:
+            self.update_walls(*self.maze.distinct_walls(on=False), global_update=True)
 
 
     def __size_window(self, maze: Maze) -> pygame.Surface:
@@ -235,7 +235,6 @@ class PyGamePen(GridPen):
         screen_width = self.__grid_size(maze.width, self.cell_width)
         screen_height = self.__grid_size(maze.height, self.cell_height)
         window_size = (screen_width, screen_height)
-
         return pygame.display.set_mode(window_size)
 
 
@@ -287,6 +286,7 @@ gen_map = {
     "DFS": DfsGenerate(),
     "Wilson": WilsonGenerate(),
     "Prim": PrimGenerate(),
+    "Rec. division": RecursiveDivisionGenerate(),
 }
 
 solver_map = {
@@ -311,6 +311,7 @@ class ControlPanel(object):
         import tkinter as tk
         import tkinter.ttk as ttk
         self.root = tk.Tk()
+        self.root.title("Configure Maze")
 
 
         def row_label(text: str):
@@ -427,6 +428,10 @@ class ControlPanel(object):
             self.launch_pygame()
         except PyGameTermination:
             pygame.quit()
+        except:
+            pygame.quit()
+            raise
+
 
 
     def launch_pygame(self):
