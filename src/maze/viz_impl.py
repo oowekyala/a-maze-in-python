@@ -68,7 +68,7 @@ class PyGamePen(GridPen):
         self.speed_factor = speed_factor  # this uses the custom setter
         self.cell_width = cell_width
         self.cell_margin = cell_margin
-        self.__screen = self.__size_window(maze)
+        self.__screen: pygame.Surface = self.__size_window(maze)
         self.__cell_kind_map = {}
         self.reset_maze(maze)
 
@@ -116,9 +116,6 @@ class PyGamePen(GridPen):
         # A maze with many cells will show a higher framerate than a smaller maze for the same speed factor
         # Otherwise some algorithms would be impossibly slow in big mazes
         # The perceived "speed" depends on the algorithm
-        # Eg generation algos that solve one cell per tick (eg dfs, before i added ticks to the backtracks)
-        # will have a runtime proportional to the maze size
-        # The `// 10` below normalizes the execution time of these algos to 10 seconds, given a speed factor of 1
         self.__speed_factor = max(sf, 0.01)
         # Requirements, for any maze size:
         # - at > 30% speed_factor, we want the framerate to be fluid (>= 20)
@@ -140,7 +137,7 @@ class PyGamePen(GridPen):
     def algo_tick(self, algo_instance, frontier_size=1):
         frontier_size = max(frontier_size, 1)
         tick_weight = 1
-        if frontier_size != 1 and frontier_size / self.maze.num_cells >= 0.02:
+        if frontier_size != 1 and self.speed_factor > .30 and frontier_size / self.maze.num_cells >= 0.2:
             #  algo_tick slows down BFS-type algorithms (eg Prim), where the algo advances a whole
             #  frontier. A tick is registered for each member of the frontier, so as the frontier grows,
             #  it hits the framerate limit much earlier than algos like DFS, which have a single cell as
