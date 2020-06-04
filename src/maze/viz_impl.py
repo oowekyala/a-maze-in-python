@@ -287,6 +287,7 @@ gen_map = {
     "Wilson": WilsonGenerate(),
     "Prim": PrimGenerate(),
     "Rec. division": RecursiveDivisionGenerate(),
+    "Sidewinder": SidewinderGenerate(),
 }
 
 solver_map = {

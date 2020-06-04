@@ -52,7 +52,7 @@ class GridPen(metaclass=ABCMeta):
 
 
     @property
-    def maze(self):
+    def maze(self) -> Maze:
         return self.__maze
 
 

@@ -332,3 +332,42 @@ class WilsonGenerate(GenerationAlgo):
 
             in_maze |= in_path
             in_path.setall(False)
+
+
+
+class SidewinderGenerate(GenerationAlgo):
+
+    def generate(self, pen: GridPen) -> None:
+        maze = pen.maze
+
+        top_row = [Cell(0, y) for y in range(0, maze.width)]
+        top_walls = [Wall(c, Side.LEFT) for c in top_row]
+
+        # Clear the top row
+        maze.set_walls(*top_walls, is_present=False)
+        pen.update_cells(*top_row, state=CellState.NORMAL)
+        pen.update_walls(*top_walls)
+
+        active: List[Wall] = []
+
+        for row in range(1, maze.height):
+
+            for col in range(0, maze.width):
+                cell = Cell(row, col)
+                break_north = maze.random.randint(0, 1)
+                if col == maze.width - 1 or break_north:
+                    pen.update_cells(cell, state=CellState.NORMAL)
+
+                    # cleanup active set
+                    active.append(cell.wall(Side.LEFT))
+                    (cell, _) = maze.random.choice(active)
+                    north_wall = Wall(cell, Side.TOP)
+                    _break_wall(north_wall, pen)
+                    active.clear()
+                else:
+                    east_wall = Wall(cell, Side.RIGHT)
+                    _break_wall(east_wall, pen)
+                    pen.update_cells(cell, east_wall.next_cell, state=CellState.NORMAL)
+                    active.append(east_wall)
+
+                pen.algo_tick(self)

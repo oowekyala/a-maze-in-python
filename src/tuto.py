@@ -1,28 +1,31 @@
-
-
-str = "1010"
-
-base = 2
-n = 0  # nombre final
-
-for i in range(0, len(str)):
-    c = int(str[-1 - i])
-    n = n + c * (base ** i)
-
-
-print(n)
+import turtle as t
 
 
 
+def tree(branch_len, depth, angle):
+    """Draw a tree from the current position"""
+
+    if depth == 0:
+        return None
+
+    t.pensize(depth)
+    t.forward(branch_len * depth)
+    t.left(angle)
+    tree(branch_len, depth - 1, angle)
+    t.right(angle * 2)
+    tree(branch_len, depth - 1, angle)
+    t.left(angle)
+    t.penup()
+    t.back(branch_len * depth)
+    t.pendown()
 
 
+t.pen(speed=0)
 
+t.left(90)
+t.penup()
+t.back(200)
+t.pendown()
+tree(10, depth=8, angle=20)
 
-5..500
-
-#     100 10  1
-# i   10² 10¹
-
-
-
-
+t.mainloop()

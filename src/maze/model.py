@@ -311,7 +311,7 @@ class Maze(object):
         for wall in walls:
             self.__check_pos(wall.cell)
             if wall.next_cell not in self:
-                return None
+                continue
 
             (cell, side) = wall
 
