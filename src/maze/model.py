@@ -7,84 +7,83 @@ from copy import copy
 from random import Random
 
 
+
 @unique
 class Side(Enum):
-    LEFT = auto()
-    TOP = auto()
-    RIGHT = auto()
-    BOT = auto()
+    # (delta row, delta col)
+    WEST = (0, -1)
+    NORTH = (-1, 0)
+    EAST = (0, +1)
+    SOUTH = (+1, 0)
+
 
     def __invert__(self):
-        if self == Side.LEFT:
-            return Side.RIGHT
-        elif self == Side.RIGHT:
-            return Side.LEFT
-        elif self == Side.TOP:
-            return Side.BOT
-        elif self == Side.BOT:
-            return Side.TOP
+        return self._opp_table[self]
+
+    @property
+    def d_row(self):
+        return self.value[0]
+
+
+    @property
+    def d_col(self):
+        return self.value[1]
+
+Side._opp_table = {Side.WEST: Side.EAST, Side.EAST: Side.WEST, Side.NORTH: Side.SOUTH, Side.SOUTH: Side.NORTH}
 
 
 @unique
 class Neighbour(Enum):
-    LL = (Side.LEFT, Side.LEFT)
-    UL = (Side.TOP, Side.LEFT)
-    UU = (Side.TOP, Side.TOP)
-    UR = (Side.TOP, Side.RIGHT)
-    RR = (Side.RIGHT, Side.RIGHT)
-    DR = (Side.BOT, Side.RIGHT)
-    DD = (Side.BOT, Side.BOT)
-    DL = (Side.BOT, Side.LEFT)
+    WW = (Side.WEST, Side.WEST)
+    NW = (Side.NORTH, Side.WEST)
+    NN = (Side.NORTH, Side.NORTH)
+    NE = (Side.NORTH, Side.EAST)
+    EE = (Side.EAST, Side.EAST)
+    SE = (Side.SOUTH, Side.EAST)
+    SS = (Side.SOUTH, Side.SOUTH)
+    SW = (Side.SOUTH, Side.WEST)
 
 
 
 class Cell(NamedTuple):
     """
-    A cell position in a maze. Mazes are row-major: x is the row, y is the column.
+    A cell position in a maze.
     """
-    x: int
-    y: int
+    row: int
+    col: int
 
 
     def __hash__(self):
-        return self.x * 200_000 + self.y
+        return self.row * 200_000 + self.col
 
 
     def wall(self, side: Side) -> 'Wall':
         return Wall(self, side=side)
 
 
-    def next(self, side: Union[Side, Neighbour], shift: int = 1) -> 'Cell':
-        (x, y) = self
+    def next(self, side, *others) -> 'Cell':
+        (row, col) = self
 
-        sides = tuple([side]) if isinstance(side, Side) else side.value
+        row += side.d_row
+        col += side.d_col
 
-        if Side.LEFT in sides:
-            y = y - shift
-        if Side.RIGHT in sides:
-            y = y + shift
-        if Side.TOP in sides:
-            x = x - shift
-        if Side.BOT in sides:
-            x = x + shift
-        return Cell(x, y)
+        for s in others:
+            row += s.d_row
+            col += s.d_col
 
-
-    def mirror(self, *, around: 'Cell'):
-        (dx, dy) = around.x - self.x, around.y - self.y
-        return Cell(around.x + dx, around.y + dy)
+        return Cell(row, col)
 
     @staticmethod
     def iterate(from_cell=None, *, w: int, h: int, step=1):
         if not from_cell:
             from_cell = Cell(0, 0)
 
-        for y in range(from_cell.y, w, step):
-            yield Cell(from_cell.x, y)
+        for col in range(from_cell.col, w, step):
+            yield Cell(from_cell.row, col)
 
-        for x in range(from_cell.x + 1, h, step):
-            for y in range(0, w, step):
-                yield Cell(x, y)
+        for row in range(from_cell.row + 1, h, step):
+            for col in range(0, w, step):
+                yield Cell(row, col)
 
     class CellSet(object):
         """
@@ -174,11 +173,11 @@ class Cell(NamedTuple):
 
 
         def __position_of(self, cell: 'Cell'):
-            return cell.x * self.width + cell.y
+            return cell.row * self.width + cell.col
 
 
         def __rev_position_of(self, idx: int) -> 'Cell':
-            return Cell(x=idx // self.width, y=idx % self.width)
+            return Cell(row=idx // self.width, col=idx % self.width)
 
 
         def __repr__(self):
@@ -194,17 +193,6 @@ class Wall(NamedTuple):
     @property
     def next_cell(self):
         return self.cell.next(side=self.side)
-
-
-    @property
-    def x(self):
-        return self.cell.x
-
-
-    @property
-    def y(self):
-        return self.cell.y
-
 
 
 class Maze(object):
@@ -233,26 +221,26 @@ class Maze(object):
         self.random_seed = random_seed
 
         self.start_cell = Cell(0, 0)
-        self.end_cell = Cell(x=self.height - 1, y=self.width - 1)
+        self.end_cell = Cell(row=self.nrows - 1, col=self.ncols - 1)
 
         # 2 bitarrays: 1 for TOP walls, one for LEFT ones
         # All walls are set
         self.__walls = {
-            Side.TOP: self.new_cell_set(initial_value=True),
-            Side.LEFT: self.new_cell_set(initial_value=True),
+            Side.NORTH: self.new_cell_set(initial_value=True),
+            Side.WEST: self.new_cell_set(initial_value=True),
         }
 
     def __wall_map(self):
         return {
-            Side.TOP: self.new_cell_set(initial_value=True),
-            Side.LEFT: self.new_cell_set(initial_value=True),
+            Side.NORTH: self.new_cell_set(initial_value=True),
+            Side.WEST: self.new_cell_set(initial_value=True),
         }
 
 
     def rand_cell(self):
         """Generate a random cell in this maze"""
-        return Cell(x=self.random.randrange(0, self.height),
-                    y=self.random.randrange(0, self.width))
+        return Cell(row=self.random.randrange(0, self.nrows),
+                    col=self.random.randrange(0, self.ncols))
 
 
     def reset(self, walls_on: bool):
@@ -261,7 +249,7 @@ class Maze(object):
 
 
     def new_cell_set(self, initial_value: bool = False) -> Cell.CellSet:
-        return Cell.CellSet.with_initial(height=self.height, width=self.width, initial_value=initial_value)
+        return Cell.CellSet.with_initial(height=self.nrows, width=self.ncols, initial_value=initial_value)
 
 
     def walls_around(self, cell: Cell, except_sides: Iterable[Side] = (), only_passages=False, blacklist=None):
@@ -275,14 +263,14 @@ class Maze(object):
 
 
     @property
-    def height(self) -> int:
-        """Number of rows, ie height, ie max value (exclusive) of the x coordinate of a Cell"""
+    def nrows(self) -> int:
+        """Number of rows, ie height"""
         return self.__nrows
 
 
     @property
-    def width(self) -> int:
-        """Number of columns, ie width, ie max value (exclusive) of the y coordinate of a Cell"""
+    def ncols(self) -> int:
+        """Number of columns, ie width"""
         return self.__ncols
 
 
@@ -300,7 +288,7 @@ class Maze(object):
 
         (cell, side) = wall
 
-        if side == Side.RIGHT or side == Side.BOT:
+        if side == Side.EAST or side == Side.SOUTH:
             return wall.next_cell in self.__walls[~side]
         else:
             return cell in self.__walls[side]
@@ -315,7 +303,7 @@ class Maze(object):
 
             (cell, side) = wall
 
-            if side == Side.RIGHT or side == Side.BOT:
+            if side == Side.EAST or side == Side.SOUTH:
                 self.__walls[~side][wall.next_cell] = is_present
             else:
                 self.__walls[side][cell] = is_present
@@ -329,24 +317,24 @@ class Maze(object):
 
 
     def __contains__(self, cell: Cell) -> bool:
-        return 0 <= cell.x < self.height \
-               and 0 <= cell.y < self.width
+        return 0 <= cell.row < self.nrows \
+               and 0 <= cell.col < self.ncols
 
 
     def all_cells(self, from_cell=None):
-        return Cell.iterate(from_cell=from_cell, h=self.height, w=self.width)
+        return Cell.iterate(from_cell=from_cell, h=self.nrows, w=self.ncols)
 
 
     def __str__(self):
         res = ""
-        for x in range(0, self.height):
+        for row in range(0, self.nrows):
             hline = "   "
             vline = "   "
 
-            for y in range(0, self.width):
-                cell = Cell(x, y)
-                has_top = cell in self.__walls[Side.TOP]
-                has_left = cell in self.__walls[Side.LEFT]
+            for col in range(0, self.ncols):
+                cell = Cell(row, col)
+                has_top = cell in self.__walls[Side.NORTH]
+                has_left = cell in self.__walls[Side.WEST]
                 hline += "+--" if has_top else "+  "
                 vline += "|" if has_left else " "
                 vline += "<>" if self.start_cell == cell \
@@ -357,7 +345,7 @@ class Maze(object):
             res += vline + "|\n"
 
         res += "   "
-        res += ("+--" * self.width)
+        res += ("+--" * self.ncols)
         res += "+"
         return res
 
@@ -368,8 +356,8 @@ class Maze(object):
         """
         for cell in self.all_cells():
 
-            if on == (cell in self.__walls[Side.TOP]):
-                yield cell.wall(Side.TOP)
+            if on == (cell in self.__walls[Side.NORTH]):
+                yield cell.wall(Side.NORTH)
 
-            if on == (cell in self.__walls[Side.LEFT]):
-                yield cell.wall(Side.LEFT)
+            if on == (cell in self.__walls[Side.WEST]):
+                yield cell.wall(Side.WEST)

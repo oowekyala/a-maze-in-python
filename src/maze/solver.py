@@ -40,7 +40,7 @@ class ManhattanDistance(Heuristic):
 
     @staticmethod
     def manhattan(c1: Cell, c2: Cell):
-        return abs(c2.x - c1.x) + abs(c1.y - c2.y)
+        return abs(c2.row - c1.row) + abs(c1.col - c2.col)
 
 
     @staticmethod
@@ -189,11 +189,11 @@ class HandRuleSolver(SolverAlgo):
         # the list (wrapping around) are your next choices in order
 
         if self.right_hand:
-            sides = [Side.RIGHT, Side.TOP, Side.LEFT, Side.BOT]  # counter-clockwise
-            orientation_map = {Side.TOP: 0, Side.RIGHT: 3, Side.BOT: 2, Side.LEFT: 1}
+            sides = [Side.EAST, Side.NORTH, Side.WEST, Side.SOUTH]  # counter-clockwise
+            orientation_map = {Side.NORTH: 0, Side.EAST: 3, Side.SOUTH: 2, Side.WEST: 1}
         else:
-            sides = [Side.LEFT, Side.TOP, Side.RIGHT, Side.BOT]  # clockwise
-            orientation_map = {Side.TOP: 0, Side.RIGHT: 1, Side.BOT: 2, Side.LEFT: 3}
+            sides = [Side.WEST, Side.NORTH, Side.EAST, Side.SOUTH]  # clockwise
+            orientation_map = {Side.NORTH: 0, Side.EAST: 1, Side.SOUTH: 2, Side.WEST: 3}
 
         num_sides = 4
         orientation = 0  # index in the list

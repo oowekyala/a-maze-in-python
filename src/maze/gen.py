@@ -61,12 +61,12 @@ class Chamber(NamedTuple):
 
     @property
     def width(self):
-        return self.bot_right.y - self.top_left.y + 1
+        return self.bot_right.col - self.top_left.col + 1
 
 
     @property
     def height(self):
-        return self.bot_right.x - self.top_left.x + 1
+        return self.bot_right.row - self.top_left.row + 1
 
 
     @property
@@ -76,14 +76,14 @@ class Chamber(NamedTuple):
 
     def border_wall(self, side: Side) -> List[Wall]:
         """Returns the range of walls bordering this chamber on a particular side"""
-        if side == Side.RIGHT or side == Side.LEFT:
-            const_y = self.bot_right.y if side == Side.RIGHT else self.top_left.y
+        if side == Side.EAST or side == Side.WEST:
+            const_col = self.bot_right.col if side == Side.EAST else self.top_left.col
 
-            return [Wall(Cell(x, const_y), side) for x in range(self.top_left.x, self.bot_right.x + 1)]
+            return [Wall(Cell(row, const_col), side) for row in range(self.top_left.row, self.bot_right.row + 1)]
         else:
-            const_x = self.bot_right.x if side == Side.BOT else self.top_left.x
+            const_row = self.bot_right.row if side == Side.SOUTH else self.top_left.row
 
-            return [Wall(Cell(const_x, y), side) for y in range(self.top_left.y, self.bot_right.y + 1)]
+            return [Wall(Cell(const_row, col), side) for col in range(self.top_left.col, self.bot_right.col + 1)]
 
 
 class RecursiveDivisionGenerate(GenerationAlgo):
@@ -92,20 +92,20 @@ class RecursiveDivisionGenerate(GenerationAlgo):
         return StartState.CLEAR
 
 
-    def divide(self, pen: GridPen, chamber: Chamber, x_divider: int, y_divider: int) -> Iterable[Chamber]:
+    def divide(self, pen: GridPen, chamber: Chamber, h_divider: int, v_divider: int) -> Iterable[Chamber]:
         """Trace two walls dividing the chamber, return the four subchambers"""
 
-        top_left =  Chamber(chamber.top_left,                            Cell(x=x_divider, y=y_divider))
-        top_right = Chamber(Cell(x=chamber.top_left.x, y=y_divider + 1), Cell(x=x_divider, y=chamber.bot_right.y))
-        bot_right = Chamber(Cell(x=x_divider + 1, y=y_divider + 1),      chamber.bot_right)
-        bot_left =  Chamber(Cell(x=x_divider + 1, y=chamber.top_left.y), Cell(x=chamber.bot_right.x, y=y_divider))
+        top_left  = Chamber(chamber.top_left,                                         Cell(row=h_divider,             col=v_divider))
+        top_right = Chamber(Cell(row=chamber.top_left.row, col=v_divider + 1),        Cell(row=h_divider,             col=chamber.bot_right.col))
+        bot_right = Chamber(Cell(row=h_divider + 1,        col=v_divider + 1),        chamber.bot_right)
+        bot_left  = Chamber(Cell(row=h_divider + 1,        col=chamber.top_left.col), Cell(row=chamber.bot_right.row, col=v_divider))
 
         new_walls = [
-            top_right.border_wall(Side.LEFT),
-            bot_right.border_wall(Side.LEFT),
+            top_right.border_wall(Side.WEST),
+            bot_right.border_wall(Side.WEST),
 
-            bot_left.border_wall(Side.TOP),
-            bot_right.border_wall(Side.TOP),
+            bot_left.border_wall(Side.NORTH),
+            bot_right.border_wall(Side.NORTH),
         ]
 
         random = pen.maze.random
@@ -130,7 +130,7 @@ class RecursiveDivisionGenerate(GenerationAlgo):
             return (c1 + c2) // 2  # could use random
 
 
-        chambers = [Chamber(Cell(0, 0), Cell(x=maze.height - 1, y=maze.width - 1))]
+        chambers = [Chamber(Cell(0, 0), Cell(row=maze.nrows - 1, col=maze.ncols - 1))]
 
         while len(chambers) > 0:
 
@@ -139,10 +139,10 @@ class RecursiveDivisionGenerate(GenerationAlgo):
             if chamber.is_unit:
                 continue
 
-            wall_x = cut(chamber.top_left.x, chamber.bot_right.x)
-            wall_y = cut(chamber.top_left.y, chamber.bot_right.y)
+            h_wall = cut(chamber.top_left.row, chamber.bot_right.row)
+            v_wall = cut(chamber.top_left.col, chamber.bot_right.col)
 
-            chambers.extend(self.divide(pen=pen, chamber=chamber, x_divider=wall_x, y_divider=wall_y))
+            chambers.extend(self.divide(pen=pen, chamber=chamber, h_divider=h_wall, v_divider=v_wall))
 
 
 
@@ -340,8 +340,8 @@ class SidewinderGenerate(GenerationAlgo):
     def generate(self, pen: GridPen) -> None:
         maze = pen.maze
 
-        top_row = [Cell(0, y) for y in range(0, maze.width)]
-        top_walls = [Wall(c, Side.LEFT) for c in top_row]
+        top_row = [Cell(0, y) for y in range(0, maze.ncols)]
+        top_walls = [Wall(c, Side.WEST) for c in top_row]
 
         # Clear the top row
         maze.set_walls(*top_walls, is_present=False)
@@ -350,22 +350,22 @@ class SidewinderGenerate(GenerationAlgo):
 
         active: List[Wall] = []
 
-        for row in range(1, maze.height):
+        for row in range(1, maze.nrows):
 
-            for col in range(0, maze.width):
+            for col in range(0, maze.ncols):
                 cell = Cell(row, col)
                 break_north = maze.random.randint(0, 1)
-                if col == maze.width - 1 or break_north:
+                if col == maze.ncols - 1 or break_north:
                     pen.update_cells(cell, state=CellState.NORMAL)
 
                     # cleanup active set
-                    active.append(cell.wall(Side.LEFT))
+                    active.append(cell.wall(Side.WEST))
                     (cell, _) = maze.random.choice(active)
-                    north_wall = Wall(cell, Side.TOP)
+                    north_wall = Wall(cell, Side.NORTH)
                     _break_wall(north_wall, pen)
                     active.clear()
                 else:
-                    east_wall = Wall(cell, Side.RIGHT)
+                    east_wall = Wall(cell, Side.EAST)
                     _break_wall(east_wall, pen)
                     pen.update_cells(cell, east_wall.next_cell, state=CellState.NORMAL)
                     active.append(east_wall)

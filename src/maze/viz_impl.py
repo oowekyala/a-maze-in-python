@@ -81,28 +81,21 @@ class PyGamePen(GridPen):
 
 
     def _cell_rect(self, cell: Cell) -> pygame.Rect:
-        return self._rect(2 * cell.x + 1, 2 * cell.y + 1)
+        return self._rect(2 * cell.row + 1, 2 * cell.col + 1)
 
 
     def _wall_rect(self, wall: Wall) -> pygame.Rect:
-        ((x, y), side) = wall
-        (x, y) = (2 * x + 1, 2 * y + 1)
-        if side == Side.TOP:
-            x -= 1
-        elif side == Side.BOT:
-            x += 1
-        elif side == Side.LEFT:
-            y -= 1
-        elif side == Side.RIGHT:
-            y += 1
-
-        return self._rect(x, y)
+        ((row, col), side) = wall
+        (row, col) = (2 * row + 1, 2 * col + 1)
+        row += side.d_row
+        col += side.d_col
+        return self._rect(row, col)
 
 
-    def _rect(self, x, y) -> pygame.Rect:
+    def _rect(self, row, col) -> pygame.Rect:
         return Rect(
-            (self.cell_margin + self.cell_width) * y + self.cell_margin,
-            (self.cell_margin + self.cell_height) * x + self.cell_margin,
+            (self.cell_margin + self.cell_width) * col + self.cell_margin,
+            (self.cell_margin + self.cell_height) * row + self.cell_margin,
             self.cell_width,
             self.cell_height
         )
@@ -232,8 +225,8 @@ class PyGamePen(GridPen):
     def __size_window(self, maze: Maze) -> pygame.Surface:
         # Set the width and height of the screen [width, height]
 
-        screen_width = self.__grid_size(maze.width, self.cell_width)
-        screen_height = self.__grid_size(maze.height, self.cell_height)
+        screen_width = self.__grid_size(maze.ncols, self.cell_width)
+        screen_height = self.__grid_size(maze.nrows, self.cell_height)
         window_size = (screen_width, screen_height)
         return pygame.display.set_mode(window_size)
 
@@ -259,7 +252,7 @@ class PyGamePen(GridPen):
         # Change the x/y screen coordinates to grid coordinates
         column = pos[0] // (self.cell_width + self.cell_margin)
         row = pos[1] // (self.cell_height + self.cell_margin)
-        return Cell(x=(row - 1) // 2, y=(column - 1) // 2)
+        return Cell(row=(row - 1) // 2, col=(column - 1) // 2)
 
 
 
