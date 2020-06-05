@@ -29,6 +29,7 @@ class Side(Enum):
     def d_col(self):
         return self.value[1]
 
+
 Side._opp_table = {Side.WEST: Side.EAST, Side.EAST: Side.WEST, Side.NORTH: Side.SOUTH, Side.SOUTH: Side.NORTH}
 
 

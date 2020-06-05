@@ -1,7 +1,8 @@
 from maze.model import *
 from maze.viz import *
 from random import Random
-from typing import Callable, List, Tuple
+from typing import Callable, List, Tuple, NamedTuple
+from collections import namedtuple
 from abc import abstractmethod, ABCMeta
 
 
@@ -35,6 +36,23 @@ class Heuristic(metaclass=ABCMeta):
 
 
 
+def best_by(target: Cell, walls: List[Wall], cost_fun: Callable[[Cell, Cell], int]) -> (Wall, int, int):
+    """Minimizes the metric"""
+    best_cost: Optional[int] = None
+    best_wall = None
+    best_i = None
+
+    for i, wall in enumerate(walls):
+        cost = cost_fun(wall.next_cell, target)
+        if not best_cost or best_cost > cost:
+            best_cost = cost
+            best_wall = wall
+            best_i = i
+
+    return best_wall, best_cost, best_i
+
+
+
 class ManhattanDistance(Heuristic):
 
     @staticmethod
@@ -42,25 +60,8 @@ class ManhattanDistance(Heuristic):
         return abs(c2.row - c1.row) + abs(c1.col - c2.col)
 
 
-    @staticmethod
-    def best_by(target: Cell, walls: List[Wall], cost_fun: Callable[[Cell, Cell], int]) -> (Wall, int, int):
-        """Minimizes the metric"""
-        best_cost: Optional[int] = None
-        best_wall = None
-        best_i = None
-
-        for i, wall in enumerate(walls):
-            cost = cost_fun(wall.next_cell, target)
-            if not best_cost or best_cost > cost:
-                best_cost = cost
-                best_wall = wall
-                best_i = i
-
-        return best_wall, best_cost, best_i
-
-
     def pick_path(self, maze: Maze, cell: Cell, walls: List[Wall]) -> (Wall, List[Wall]):
-        (_, _, best_i) = ManhattanDistance.best_by(maze.end_cell, walls, cost_fun=ManhattanDistance.manhattan)
+        (_, _, best_i) = best_by(maze.end_cell, walls, cost_fun=ManhattanDistance.manhattan)
 
         return walls.pop(best_i), walls
 
@@ -91,10 +92,10 @@ class DfsSolver(SolverAlgo):
         self.heuristic = heuristic
 
 
-    def solve(self, pen: GridPen) -> None:
+    def solve(self, pen: GridPen, visited: Cell.CellSet = None) -> None:
         maze = pen.maze
-
-        visited = maze.new_cell_set(False)
+        if not visited:
+            visited = maze.new_cell_set(False)
         stack = []
         cell = maze.start_cell
 
@@ -184,7 +185,7 @@ class HandRuleSolver(SolverAlgo):
         pen.update_cells(cell, state=CellState.BEST_PATH)
 
         # The orientation depends on the last turn you took
-        # Eg if you're looking down (towards Side.BOT), your right-hand is at Side.LEFT, your back is Side.TOP, etc
+        # Eg if you're looking down (towards Side.SOUTH), your right-hand is at Side.WEST, your back is Side.NORTH, etc
         # The orientation map can be read like so, eg for the right-hand rule:
         # Whatever your orientation, for the right-hand rule, on each cell, you'll prefer turning right
         # if it's free, then in front of you, then left, then go back. If you're looking in direction `s`,
@@ -217,3 +218,43 @@ class HandRuleSolver(SolverAlgo):
             cell = next_wall.next_cell
 
             pen.paint_wall_path(next_wall, state=CellState.BEST_PATH)
+
+
+
+class DeadEndFillingSolver(SolverAlgo):
+
+    def solve(self, pen: GridPen) -> None:
+        maze = pen.maze
+
+        filled = maze.new_cell_set()
+        while True:
+            # Scan maze to find dead ends
+
+            def is_dead_end(c, walls):
+                return c != maze.end_cell and c != maze.start_cell and len(walls) == 1
+
+            dead_ends = [(c, walls)
+                         for c in maze.all_cells()
+                         if c not in filled
+                         for walls in [maze.walls_around(c, only_passages=True, blacklist=filled)]
+                         if is_dead_end(c, walls)
+                         ]
+
+            if len(dead_ends) == 0:
+                break
+
+            for c, walls in dead_ends:
+                # fill up the dead end
+                while is_dead_end(c, walls):
+                    wall, = walls
+                    pen.update_cells(c, state=CellState.IGNORED)
+                    pen.update_walls(wall, state=CellState.IGNORED)
+                    filled += c
+
+                    pen.algo_tick(self)
+
+                    c = wall.next_cell
+                    walls = maze.walls_around(c, only_passages=True, blacklist=filled)
+
+        # use the dfs solver to trace the best path
+        DfsSolver(heuristic=NoHeuristic()).solve(pen, visited=filled)
