@@ -1,7 +1,7 @@
 from maze.model import *
 from maze.viz import *
 from random import Random
-from typing import Callable, List, Tuple, NamedTuple
+from typing import Callable, List, Tuple, NamedTuple, Set
 from collections import namedtuple
 from abc import abstractmethod, ABCMeta
 
@@ -145,14 +145,16 @@ class BfsSolver(SolverAlgo):
         pen.update_cells(cell, state=CellState.BEST_PATH)
 
         while cell != maze.end_cell:
-            visited += cell
+            if cell not in visited:
 
-            pen.update_cells(cell, state=CellState.IGNORED)
+                visited += cell
 
-            new_walls: List[Wall] = maze.walls_around(cell, only_passages=True, blacklist=visited)
-            queue2.extend(new_walls)
+                pen.update_cells(cell, state=CellState.IGNORED)
 
-            # pen.paint_wall_path(*new_walls, state=CellState.BEST_PATH)
+                new_walls: List[Wall] = maze.walls_around(cell, only_passages=True, blacklist=visited)
+                queue2.extend(new_walls)
+
+                # pen.paint_wall_path(*new_walls, state=CellState.BEST_PATH)
 
             if len(queue) == 0:
                 assert len(queue2) > 0, "Unreachable end cell"
