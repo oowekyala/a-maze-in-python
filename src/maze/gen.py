@@ -377,15 +377,23 @@ class SidewinderGenerate(GenerationAlgo):
 class KruskalTree(object):
 
     def __init__(self):
-        self.parent: Optional[KruskalTree] = None
+        self.__root: KruskalTree = self
 
 
-    def root(self):
-        last = self
-        while last.parent:
-            last = last.parent
+    def root(self, replacement=None):
+        r = self
+        to_update = []
+        while r.__root is not r:
+            to_update.append(r)
+            r = r.__root
 
-        return last
+        real_root = replacement or r
+        r.__root = real_root
+
+        for tree in to_update:
+            tree.__root = real_root
+
+        return r
 
 
     def is_connected(self, tree: 'KruskalTree'):
@@ -393,7 +401,7 @@ class KruskalTree(object):
 
 
     def connect(self, tree: 'KruskalTree'):
-        tree.root().parent = self
+        tree.root(replacement=self)
 
 
 
@@ -425,7 +433,6 @@ class KruskalGenerate(GenerationAlgo):
             if wall.next_cell not in maze:
                 continue
             (set1, set2) = set_of(wall.cell), set_of(wall.next_cell)
-
 
             if not set1.is_connected(set2):
                 set1.connect(set2)
