@@ -381,7 +381,11 @@ class KruskalTree(object):
 
 
     def root(self):
-        return self.parent.root() if self.parent else self
+        last = self
+        while last.parent:
+            last = last.parent
+
+        return last
 
 
     def is_connected(self, tree: 'KruskalTree'):
