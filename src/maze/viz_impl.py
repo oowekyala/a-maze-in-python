@@ -72,6 +72,8 @@ class PyGamePen(GridPen):
         self.cell_margin = cell_margin
         self.__screen: pygame.Surface = self.__size_window(maze)
         self.__cell_kind_map = {}
+        self.__dirty: Rect = Rect(0, 0, 0, 0)
+        self.__global_update = False
         self.reset_maze(maze)
 
 
@@ -124,8 +126,6 @@ class PyGamePen(GridPen):
 
     def __single_update(self, rect: pygame.Rect, color: Color):
         pygame.draw.rect(self.__screen, conv_color(color), rect)
-        pygame.display.update(rect)
-        pygame.event.pump()
 
 
     def algo_tick(self, algo_instance, frontier_size=1):
@@ -138,6 +138,13 @@ class PyGamePen(GridPen):
             #  frontier
 
             tick_weight = 5
+
+        if self.__global_update:
+            pygame.display.flip()
+        elif self.__dirty:
+            pygame.display.update(self.__dirty)
+
+        self.__dirty = None
         self.clock.tick(tick_weight * self.__algo_framerate)
         self.check_terminated()
 
@@ -182,7 +189,7 @@ class PyGamePen(GridPen):
                         get_color: Callable[[T], Optional[Color]],
                         get_rect: Callable[[T], Rect],
                         global_update: bool = False):
-        area_to_update: Optional[Rect] = None
+        dirty: Optional[Rect] = None
 
         for cell in cells:
             color = get_color(cell)
@@ -193,18 +200,15 @@ class PyGamePen(GridPen):
             pygame.draw.rect(self.__screen, conv_color(color), rect)
 
             if not global_update:
-                if area_to_update:
-                    area_to_update = area_to_update.union(rect)
+                if dirty:
+                    dirty = dirty.union(rect)
                 else:
-                    area_to_update = rect
+                    dirty = rect
 
-        if area_to_update:
-            pygame.display.update(area_to_update)
-            pygame.event.pump()
-        elif global_update:
-            pygame.display.flip()
-            pygame.event.pump()
-
+        if global_update:
+            self.__global_update = True
+        elif dirty:
+            self.__dirty = self.__dirty.union(dirty) if self.__dirty else dirty
 
     def reset_maze(self, maze: Maze):
         prev_maze: Maze = self.maze
@@ -278,6 +282,7 @@ def generate(generator,
 gen_map = {
     "DFS": DfsGenerate(),
     "Wilson": WilsonGenerate(),
+    "Blank": BlankGen(),
     "Prim": PrimGenerate(),
     "Rec. division": RecursiveDivisionGenerate(),
     "Sidewinder": SidewinderGenerate(),
@@ -442,7 +447,10 @@ class ControlPanel(object):
         )
         if True:  # TODO
             solver = solver_map[self.solver_choicebox.get()]
-            solver.solve(pygame_pen)
+
+            import maze._profile_calls as profiler
+            profiler.profile(solver.solve, pygame_pen)
+            # solver.solve(pygame_pen)
 
         pygame_pen.loop_until_exit()
 

@@ -1,6 +1,6 @@
 import textwrap
 from enum import Enum, unique, auto
-from typing import NamedTuple, Optional, Union, Iterable
+from typing import NamedTuple, Optional, Union, Iterable, Any
 from bitarray import bitarray
 from bitarray.util import rindex
 from copy import copy
@@ -18,7 +18,7 @@ class Side(Enum):
 
 
     def __invert__(self):
-        return self._opp_table[self]
+        return Side._opp_table[self]
 
     @property
     def d_row(self):
@@ -62,7 +62,12 @@ class Cell(NamedTuple):
         return Wall(self, side=side)
 
 
-    def next(self, side, *others) -> 'Cell':
+    def next(self, side) -> 'Cell':
+        return Cell(self.row + side.d_row,
+                    self.col + side.d_col)
+
+
+    def next_path(self, side, *others) -> 'Cell':
         (row, col) = self
 
         row += side.d_row
@@ -73,6 +78,7 @@ class Cell(NamedTuple):
             col += s.d_col
 
         return Cell(row, col)
+
 
     @staticmethod
     def iterate(from_cell=None, *, w: int, h: int, step=1):
@@ -197,15 +203,7 @@ class Wall(NamedTuple):
 
 
 class Maze(object):
-    """A maze with fixed-dimensions. Cells are either walled or free. Initially all cells are walled.
-       apply_gen generates corridors by breaking some walls
-
-            y
-       ------->
-       |
-      x|
-       v
-       """
+    """A maze with fixed-dimensions."""
 
 
     def __init__(self, nrows: int, ncols: int, random_seed: int):
@@ -257,10 +255,12 @@ class Maze(object):
         return [w
                 for s in list(Side)
                 if s not in except_sides
+                # these should use python 3.8's assignment expression (:=)
                 for w in [cell.wall(s)]
-                if w.next_cell in self
+                for next_cell in [w.next_cell]
+                if next_cell in self
                 if (not only_passages) or (not self.has_wall(w))
-                if (not blacklist or w.next_cell not in blacklist)]
+                if (not blacklist or next_cell not in blacklist)]
 
 
     @property
@@ -284,13 +284,14 @@ class Maze(object):
     def has_wall(self, wall: Wall) -> bool:
         """True if the wall exists, false if not. Throws IndexError if cell is out-of-bounds."""
         self.__check_pos(wall.cell)
-        if wall.next_cell not in self:
+        next_cell = wall.next_cell
+        if next_cell not in self:
             return True
 
         (cell, side) = wall
 
         if side == Side.EAST or side == Side.SOUTH:
-            return wall.next_cell in self.__walls[~side]
+            return next_cell in self.__walls[~side]
         else:
             return cell in self.__walls[side]
 

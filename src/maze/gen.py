@@ -51,6 +51,15 @@ def _break_wall(wall: Wall, pen: GridPen):
     pen.update_walls(wall)
 
 
+class BlankGen(GenerationAlgo):
+
+    def start_state(self) -> StartState:
+        return StartState.CLEAR
+
+    def generate(self, pen: GridPen) -> None:
+        pass
+
+
 
 class Chamber(NamedTuple):
     """A rectangular region of a maze"""

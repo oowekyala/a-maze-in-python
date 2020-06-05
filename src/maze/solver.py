@@ -152,10 +152,12 @@ class BfsSolver(SolverAlgo):
             new_walls: List[Wall] = maze.walls_around(cell, only_passages=True, blacklist=visited)
             queue2.extend(new_walls)
 
-            pen.paint_wall_path(*new_walls, state=CellState.BEST_PATH)
+            # pen.paint_wall_path(*new_walls, state=CellState.BEST_PATH)
 
             if len(queue) == 0:
                 assert len(queue2) > 0, "Unreachable end cell"
+
+                pen.paint_wall_path(*queue2, state=CellState.BEST_PATH)
 
                 # swap queues
                 tmp = queue
