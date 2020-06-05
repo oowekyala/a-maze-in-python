@@ -63,8 +63,8 @@ class GridPen(metaclass=ABCMeta):
         pass
 
 
-    def algo_tick(self, algo_instance, frontier_size=1):
-        """Record one step in the algorithm currently executing. This may be used to slow down some algorithms."""
+    def tick_frame(self, algo_instance, frontier_size=1):
+        """Record one step in the algorithm currently executing. This update the screen with the updates done since the previous tick."""
         pass
 
     def paint_wall_path(self, *walls: Wall, state: CellState):

@@ -102,7 +102,6 @@ class DfsSolver(SolverAlgo):
         pen.update_cells(cell, state=CellState.BEST_PATH)
 
         while cell != maze.end_cell:
-            pen.algo_tick(self)
             visited += cell
 
             walls: List[Wall] = maze.walls_around(cell, only_passages=True, blacklist=visited)
@@ -112,7 +111,7 @@ class DfsSolver(SolverAlgo):
                 while len(stack) > 0 and len(walls) == 0:
                     (prev_wall, others) = stack.pop()
                     pen.paint_wall_path(prev_wall, state=CellState.IGNORED)
-                    pen.algo_tick(self)
+                    pen.tick_frame(self)
 
                     walls = [w for w in others if w.next_cell not in visited]
 
@@ -129,6 +128,7 @@ class DfsSolver(SolverAlgo):
 
             pen.paint_wall_path(next_wall, state=CellState.BEST_PATH)
             pen.paint_wall_path(*walls, state=CellState.ACTIVE)
+            pen.tick_frame(self)
 
 
 
@@ -165,12 +165,15 @@ class BfsSolver(SolverAlgo):
                 queue2 = tmp
 
                 # algo ticks correspond to one step of the whole frontier
-                pen.algo_tick(self)
+                pen.tick_frame(self)
 
             next_wall = queue.pop(0)
 
             pen.update_walls(next_wall, state=CellState.IGNORED)
             cell = next_wall.next_cell
+
+        pen.tick_frame(self)
+
 
 
 
@@ -205,7 +208,6 @@ class HandRuleSolver(SolverAlgo):
         orientation = 0  # index in the list
 
         while cell != maze.end_cell:
-            pen.algo_tick(self)
 
             next_wall = None
             for i in range(num_sides):
@@ -220,6 +222,8 @@ class HandRuleSolver(SolverAlgo):
             cell = next_wall.next_cell
 
             pen.paint_wall_path(next_wall, state=CellState.BEST_PATH)
+            pen.tick_frame(self)
+
 
 
 
@@ -253,7 +257,7 @@ class DeadEndFillingSolver(SolverAlgo):
                     pen.update_walls(wall, state=CellState.IGNORED)
                     filled += c
 
-                    pen.algo_tick(self)
+                    pen.tick_frame(self)
 
                     c = wall.next_cell
                     walls = maze.walls_around(c, only_passages=True, blacklist=filled)

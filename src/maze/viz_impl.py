@@ -41,7 +41,7 @@ cell_colors: Dict[CellKind, Dict[CellState, Color]] = {
         CellState.UNDISCOVERED: Color.GREY
     },
     CellKind.START: {s: Color.RED for s in list(CellState)},
-    CellKind.END: {s: Color.ORANGE for s in list(CellState)},
+    CellKind.END: {s: Color.RED for s in list(CellState)},
 }
 
 cell_colors[CellKind.WALL_OFF] = {**cell_colors[CellKind.REGULAR], CellState.UNDISCOVERED: WALL_COLOR}
@@ -126,9 +126,10 @@ class PyGamePen(GridPen):
 
     def __single_update(self, rect: pygame.Rect, color: Color):
         pygame.draw.rect(self.__screen, conv_color(color), rect)
+        self.update_dirty(rect)
 
 
-    def algo_tick(self, algo_instance, frontier_size=1):
+    def tick_frame(self, algo_instance, frontier_size=1):
         frontier_size = max(frontier_size, 1)
         tick_weight = 1
         if frontier_size != 1 and self.speed_factor > .30 and frontier_size / self.maze.num_cells >= 0.2:
@@ -208,7 +209,12 @@ class PyGamePen(GridPen):
         if global_update:
             self.__global_update = True
         elif dirty:
-            self.__dirty = self.__dirty.union(dirty) if self.__dirty else dirty
+            self.update_dirty(dirty)
+
+
+    def update_dirty(self, dirty):
+        self.__dirty = self.__dirty.union(dirty) if self.__dirty else dirty
+
 
     def reset_maze(self, maze: Maze):
         prev_maze: Maze = self.maze
@@ -282,7 +288,7 @@ def generate(generator,
 gen_map = {
     "DFS": DfsGenerate(),
     "Wilson": WilsonGenerate(),
-    "Blank": BlankGen(),
+    "No walls": BlankGen(),
     "Prim": PrimGenerate(),
     "Rec. division": RecursiveDivisionGenerate(),
     "Sidewinder": SidewinderGenerate(),
@@ -447,10 +453,7 @@ class ControlPanel(object):
         )
         if True:  # TODO
             solver = solver_map[self.solver_choicebox.get()]
-
-            import maze._profile_calls as profiler
-            profiler.profile(solver.solve, pygame_pen)
-            # solver.solve(pygame_pen)
+            solver.solve(pygame_pen)
 
         pygame_pen.loop_until_exit()
 

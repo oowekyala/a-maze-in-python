@@ -43,6 +43,7 @@ def apply_gen(gen: GenerationAlgo, pen: GridPen):
     pen.draw_entire_maze(cell_state=state, is_walled=is_walled)
 
     gen.generate(pen=pen)
+    pen.tick_frame(gen)
 
 
 
@@ -126,7 +127,7 @@ class RecursiveDivisionGenerate(GenerationAlgo):
         for walls in new_walls:
             pen.maze.set_walls(*walls, is_present=True)
             pen.update_walls(*walls)
-            pen.algo_tick(self)
+            pen.tick_frame(self)
 
         return [top_left, top_right, bot_right, bot_left]
 
@@ -198,7 +199,7 @@ class PrimGenerate(GenerationAlgo):
             else:
                 pen.update_walls(wall)  # Remove ACTIVE status
 
-            pen.algo_tick(self, frontier_size=len(walls))
+            pen.tick_frame(self, frontier_size=len(walls))
 
 
 
@@ -215,7 +216,7 @@ class DfsGenerate(GenerationAlgo):
             visited += cell
             pen.update_cells(cell, state=CellState.NORMAL)
 
-            pen.algo_tick(self)
+            pen.tick_frame(self)
 
             walls: List[Wall] = maze.walls_around(cell, blacklist=visited)
 
@@ -225,7 +226,7 @@ class DfsGenerate(GenerationAlgo):
                     walls = []
                     for w in walls_p:
                         if w.next_cell in visited:
-                            pen.algo_tick(self)
+                            pen.tick_frame(self)
                         else:
                             walls.append(w)
 
@@ -296,7 +297,7 @@ class WilsonGenerate(GenerationAlgo):
             forbidden_moves: Iterable[Side] = ()
 
             while cur_cell not in in_maze:  # loop-erased random walk until we find a maze cell
-                pen.algo_tick(self)
+                pen.tick_frame(self)
 
                 neighbors: List[Wall] = maze.walls_around(cur_cell, except_sides=forbidden_moves)
 
@@ -379,7 +380,7 @@ class SidewinderGenerate(GenerationAlgo):
                     pen.update_cells(cell, east_wall.next_cell, state=CellState.NORMAL)
                     active.append(east_wall)
 
-                pen.algo_tick(self)
+                pen.tick_frame(self)
 
 
 
@@ -449,4 +450,4 @@ class KruskalGenerate(GenerationAlgo):
                 _break_wall(wall, pen)
                 pen.update_cells(wall.cell, wall.next_cell, state=CellState.NORMAL)
 
-                pen.algo_tick(self)
+                pen.tick_frame(self)
