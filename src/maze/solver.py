@@ -9,12 +9,11 @@ from abc import abstractmethod, ABCMeta
 class SolverAlgo(metaclass=ABCMeta):
 
     @abstractmethod
-    def solve(self, maze: Maze, pen: GridPen) -> None:
+    def solve(self, pen: GridPen) -> None:
         """
         Find the path from maze.start_cell to maze.end_cell and use the pen to display it.
 
-        :param maze:            Receiver maze
-        :param pen:             Pen to draw the generation
+        :param pen:             Pen to draw the generation (contains the maze)
         """
         pass
 
@@ -92,7 +91,8 @@ class DfsSolver(SolverAlgo):
         self.heuristic = heuristic
 
 
-    def solve(self, maze: Maze, pen: GridPen) -> None:
+    def solve(self, pen: GridPen) -> None:
+        maze = pen.maze
 
         visited = maze.new_cell_set(False)
         stack = []
@@ -133,7 +133,8 @@ class DfsSolver(SolverAlgo):
 
 class BfsSolver(SolverAlgo):
 
-    def solve(self, maze: Maze, pen: GridPen) -> None:
+    def solve(self, pen: GridPen) -> None:
+        maze = pen.maze
 
         visited = maze.new_cell_set(False)
         queue = []
@@ -176,7 +177,9 @@ class HandRuleSolver(SolverAlgo):
         self.right_hand = is_right_hand_rule
 
 
-    def solve(self, maze: Maze, pen: GridPen) -> None:
+    def solve(self, pen: GridPen) -> None:
+        maze = pen.maze
+
         cell = maze.start_cell
         pen.update_cells(cell, state=CellState.BEST_PATH)
 

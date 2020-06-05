@@ -441,7 +441,7 @@ class ControlPanel(object):
         )
         if True:  # TODO
             solver = solver_map[self.solver_choicebox.get()]
-            solver.solve(pygame_pen.maze, pygame_pen)
+            solver.solve(pygame_pen)
 
         pygame_pen.loop_until_exit()
 
