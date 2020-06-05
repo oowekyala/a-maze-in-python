@@ -371,3 +371,62 @@ class SidewinderGenerate(GenerationAlgo):
                     active.append(east_wall)
 
                 pen.algo_tick(self)
+
+
+
+class KruskalTree(object):
+
+    def __init__(self):
+        self.parent: Optional[KruskalTree] = None
+
+
+    def root(self):
+        return self.parent.root() if self.parent else self
+
+
+    def is_connected(self, tree: 'KruskalTree'):
+        return self is tree or self.root() is tree.root()
+
+
+    def connect(self, tree: 'KruskalTree'):
+        tree.root().parent = self
+
+
+
+class KruskalGenerate(GenerationAlgo):
+
+    def generate(self, pen: GridPen) -> None:
+        maze = pen.maze
+
+        # all edges of the maze
+        edges = [
+            w
+            for cell in maze.all_cells()
+            for w in [cell.wall(Side.WEST), cell.wall(Side.NORTH)]
+        ]
+
+        maze.random.shuffle(edges)
+
+        # 2D array of tree sets
+        sets = [[KruskalTree() for _ in range(maze.ncols)] for _ in range(maze.nrows)]
+
+
+        def set_of(cell) -> KruskalTree:
+            return sets[cell.row][cell.col]
+
+
+        # kruskal
+        while len(edges) > 0:
+            wall = edges.pop()
+            if wall.next_cell not in maze:
+                continue
+            (set1, set2) = set_of(wall.cell), set_of(wall.next_cell)
+
+
+            if not set1.is_connected(set2):
+                set1.connect(set2)
+
+                _break_wall(wall, pen)
+                pen.update_cells(wall.cell, wall.next_cell, state=CellState.NORMAL)
+
+                pen.algo_tick(self)

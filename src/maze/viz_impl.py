@@ -281,6 +281,7 @@ gen_map = {
     "Prim": PrimGenerate(),
     "Rec. division": RecursiveDivisionGenerate(),
     "Sidewinder": SidewinderGenerate(),
+    "Kruskal": KruskalGenerate(),
 }
 
 solver_map = {
