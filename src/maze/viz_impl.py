@@ -1,6 +1,6 @@
 from typing import Dict
 
-from pygame import Rect
+from pygame import Rect, Surface
 import pygame
 
 import random
@@ -47,33 +47,92 @@ cell_colors: Dict[CellKind, Dict[CellState, Color]] = {
 cell_colors[CellKind.WALL_OFF] = {**cell_colors[CellKind.REGULAR], CellState.UNDISCOVERED: WALL_COLOR}
 cell_colors[CellKind.WALL_ON] = {**cell_colors[CellKind.WALL_OFF], CellState.NORMAL: WALL_COLOR}
 
+# below this limit (inclusive), the speed factor is an actual framerate cap
+# above, it depends on the algo/maze size
+SPEED_FACTOR_RT_CUT = .3
 
 
-class PyGameTermination(Exception):
+
+class WindowTermination(Exception):
     pass
 
-class PyGamePen(GridPen):
-    """
-    Implementation of GridPen using pygame as a backend.
-    """
 
 
-    def __init__(self, maze: Maze,
-                 speed_factor: float = 1.0,
-                 cell_width=6,
-                 cell_margin=0):
-        super().__init__(maze)
+class PygameWindow(object):
+
+    def __init__(self):
         pygame.init()
         pygame.display.set_caption("A maze")
 
         self.clock = pygame.time.Clock()
+        self.__screen: Optional[Surface] = None
+        self.__grid_surface = None
+
+
+    def set_grid_dimensions(self, width, height):
+        self.__screen = pygame.display.set_mode((width, height))
+
+
+    def loop_until_exit(self):
+        while True:
+            self.handle_window_events()
+            self.clock.tick(60)
+
+
+    def handle_window_events(self):
+        """Process pygame events. Done on frame ticks, as control flow belongs to the algo in that case"""
+        if pygame.event.get(eventtype=pygame.QUIT):
+            raise WindowTermination()
+
+
+    def __enter__(self):
+        return self
+
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pygame.quit()
+
+        return exc_type == WindowTermination
+
+
+    def update_grid(self, grid_surf: Surface, dirty: Optional[Rect]):
+        if not self.__screen:
+            return
+
+        grid_top_left_corner = (0, 0)
+
+        self.__screen.blit(source=grid_surf, dest=grid_top_left_corner, area=dirty)
+
+        if dirty:
+            pygame.display.update(rectangle=dirty)
+        else:
+            pygame.display.flip()
+
+
+class VirtualSurfacePen(GridPen):
+    """Draws a maze algorithm on an internal Surface. Relays drawing events to a PygameWindow, which
+       may perform transformations to handle zoom/position/etc"""
+
+    def __init__(self, maze: Maze,
+                 backend: PygameWindow,
+                 speed_factor: float = 1.0,
+                 cell_width=6,
+                 cell_margin=0):
+        super().__init__(maze)
+
         self.speed_factor = speed_factor  # this uses the custom setter
+
         self.cell_width = cell_width
         self.cell_margin = cell_margin
-        self.__screen: pygame.Surface = self.__size_window(maze)
-        self.__cell_kind_map = {}
+
+        self.__backend = backend
+
+        dims = self.__surface_dimensions(maze)
+        self.__grid_surface: Surface = Surface(dims)
+        backend.set_grid_dimensions(*dims)
         self.__dirty: Rect = Rect(0, 0, 0, 0)
         self.__global_update = False
+
         self.reset_maze(maze)
 
 
@@ -103,6 +162,40 @@ class PyGamePen(GridPen):
         )
 
 
+    def __surface_dimensions(self, maze: Maze) -> (int, int):
+        """Set the width and height of the screen, return the surface on which to draw"""
+
+        screen_width = self.__grid_size(maze.ncols, self.cell_width)
+        screen_height = self.__grid_size(maze.nrows, self.cell_height)
+        return screen_width, screen_height
+
+
+    def __grid_size(self, dim: int, inc: int):
+        return (2 * dim + 1) * (inc + self.cell_margin) + self.cell_margin * 2
+
+
+    def tick_frame(self, algo_instance, frontier_size=1):
+        frontier_size = max(frontier_size, 1)
+        tick_weight = 1
+        if frontier_size != 1 and self.speed_factor > .30 and frontier_size / self.maze.num_cells >= 0.2:
+            #  algo_tick slows down BFS-type algorithms (eg Prim), where the algo advances a whole
+            #  frontier. A tick is registered for each member of the frontier, so as the frontier grows,
+            #  it hits the framerate limit much earlier than algos like DFS, which have a single cell as
+            #  frontier
+
+            tick_weight = 5
+
+        if self.__global_update:
+            self.__backend.update_grid(grid_surf=self.__grid_surface, dirty=None)
+        elif self.__dirty:
+            self.__backend.update_grid(grid_surf=self.__grid_surface, dirty=self.__dirty)
+
+        self.__dirty = None
+        self.__backend.handle_window_events()
+        if self.speed_factor < 1.0:
+            self.__backend.clock.tick(tick_weight * self.__algo_framerate)
+
+
     @property
     def speed_factor(self):
         return self.__speed_factor
@@ -118,36 +211,11 @@ class PyGamePen(GridPen):
         # - at > 30% speed_factor, we want the framerate to be fluid (>= 20)
         # - at the highest speed_factor, we want that any maze be generated in under 15 seconds (for linear generators)
 
-        if self.speed_factor <= .30:
+        if self.speed_factor <= SPEED_FACTOR_RT_CUT:
+            # under 30%
             self.__algo_framerate = self.speed_factor * 100
         else:
             self.__algo_framerate = max(self.speed_factor * self.maze.num_cells // 10, 20)
-
-
-    def __single_update(self, rect: pygame.Rect, color: Color):
-        pygame.draw.rect(self.__screen, conv_color(color), rect)
-        self.update_dirty(rect)
-
-
-    def tick_frame(self, algo_instance, frontier_size=1):
-        frontier_size = max(frontier_size, 1)
-        tick_weight = 1
-        if frontier_size != 1 and self.speed_factor > .30 and frontier_size / self.maze.num_cells >= 0.2:
-            #  algo_tick slows down BFS-type algorithms (eg Prim), where the algo advances a whole
-            #  frontier. A tick is registered for each member of the frontier, so as the frontier grows,
-            #  it hits the framerate limit much earlier than algos like DFS, which have a single cell as
-            #  frontier
-
-            tick_weight = 5
-
-        if self.__global_update:
-            pygame.display.flip()
-        elif self.__dirty:
-            pygame.display.update(self.__dirty)
-
-        self.__dirty = None
-        self.clock.tick(tick_weight * self.__algo_framerate)
-        self.check_terminated()
 
 
     def update_walls(self,
@@ -160,10 +228,7 @@ class PyGamePen(GridPen):
             return cell_colors[kind][state]
 
 
-        if len(walls) == 1:
-            self.__single_update(rect=self._wall_rect(walls[0]), color=get_color(walls[0]))
-        else:
-            self._batched_update(walls, get_color, get_rect=self._wall_rect)
+        self._batched_update(walls, get_color, get_rect=self._wall_rect, global_update=global_update)
 
 
     def update_cells(self, *cells: Cell, state: CellStateSelector, global_update: bool = False) -> None:
@@ -176,10 +241,7 @@ class PyGamePen(GridPen):
             return cell_colors[self.get_kind(cell)][s] if s else None
 
 
-        if len(cells) == 1:
-            self.__single_update(rect=self._cell_rect(cells[0]), color=get_color(cells[0]))
-        else:
-            self._batched_update(cells, get_color, get_rect=self._cell_rect)
+        self._batched_update(cells, get_color, get_rect=self._cell_rect, global_update=global_update)
 
 
     T = TypeVar('T')
@@ -192,27 +254,28 @@ class PyGamePen(GridPen):
                         global_update: bool = False):
         dirty: Optional[Rect] = None
 
+        self.__global_update |= global_update
+
         for cell in cells:
             color = get_color(cell)
             if not color:
                 continue
 
             rect = get_rect(cell)
-            pygame.draw.rect(self.__screen, conv_color(color), rect)
+            pygame.draw.rect(self.__grid_surface, conv_color(color), rect)
 
-            if not global_update:
+            if not self.__global_update:
                 if dirty:
                     dirty = dirty.union(rect)
                 else:
                     dirty = rect
 
-        if global_update:
-            self.__global_update = True
-        elif dirty:
-            self.update_dirty(dirty)
+        if dirty and not self.__global_update:
+            self.__update_dirty(dirty)
 
 
-    def update_dirty(self, dirty):
+    def __update_dirty(self, dirty: Rect):
+        """Extend the dirty region to include the given dirty rectangle"""
         self.__dirty = self.__dirty.union(dirty) if self.__dirty else dirty
 
 
@@ -220,65 +283,41 @@ class PyGamePen(GridPen):
         prev_maze: Maze = self.maze
         super().reset_maze(maze)  # self.maze = maze
         if prev_maze is not maze:
-            self.__screen = self.__size_window(maze)
+            dims = self.__surface_dimensions(maze)
+            self.__grid_surface = pygame.Surface(dims)
+            self.__backend.set_grid_dimensions(dims)
 
 
     def draw_entire_maze(self, cell_state: CellState, is_walled: bool = True):
-        self.__screen.fill(conv_color(WALL_COLOR))
+        self.__grid_surface.fill(conv_color(WALL_COLOR))
 
         self.update_cells(*self.maze.all_cells(), state=cell_state, global_update=True)
 
         if self.maze.mod_count != 0 or not is_walled:
             self.update_walls(*self.maze.distinct_walls(on=False), global_update=True)
 
-
-    def __size_window(self, maze: Maze) -> pygame.Surface:
-        # Set the width and height of the screen [width, height]
-
-        screen_width = self.__grid_size(maze.ncols, self.cell_width)
-        screen_height = self.__grid_size(maze.nrows, self.cell_height)
-        window_size = (screen_width, screen_height)
-        return pygame.display.set_mode(window_size)
-
-
-    def __grid_size(self, dim: int, inc: int):
-        return (2 * dim + 1) * (inc + self.cell_margin) + self.cell_margin * 2
-
+        self.tick_frame(self)
 
     def loop_until_exit(self):
-        while True:
-            self.check_terminated()
-            self.clock.tick(60)
-
-
-    def check_terminated(self):
-        if pygame.event.get(eventtype=pygame.QUIT):
-            raise PyGameTermination()
-
-
-    def get_mouse_cell(self):
-        # User moves the mouse. Get the position
-        pos = pygame.mouse.get_pos()
-        # Change the x/y screen coordinates to grid coordinates
-        column = pos[0] // (self.cell_width + self.cell_margin)
-        row = pos[1] // (self.cell_height + self.cell_margin)
-        return Cell(row=(row - 1) // 2, col=(column - 1) // 2)
+        self.__backend.loop_until_exit()
 
 
 
 def generate(generator,
-             nrows,
-             ncols,
-             random_seed=random.randint(0, 100_000),
+             nrows: int,
+             ncols: int,
+             window: PygameWindow,
+             random_seed: int = random.randint(0, 100_000),
              cell_width=6,
              speed_factor: float = 1.0,
-             visualize=True) -> PyGamePen:
+             visualize=True) -> VirtualSurfacePen:
+
     maze = Maze(nrows=nrows, ncols=ncols, random_seed=random_seed)
-    pygame_pen = PyGamePen(maze, speed_factor=speed_factor, cell_width=cell_width)
+    pygame_pen = VirtualSurfacePen(maze, backend=window, speed_factor=speed_factor, cell_width=cell_width)
     if visualize:
         apply_gen(generator, pen=pygame_pen)
     else:
-        apply_gen(generator, pen=GridPen.noop_pen(maze))
+        apply_gen(generator, pen=GridPen.noop_pen(maze, tick_function=window.handle_window_events))
         pygame_pen.draw_entire_maze(cell_state=CellState.NORMAL)
 
     return pygame_pen
@@ -431,29 +470,19 @@ class ControlPanel(object):
 
 
     def go_button_press(self):
-        try:
-            self.launch_pygame()
-        except PyGameTermination:
-            pygame.quit()
-        except:
-            pygame.quit()
-            raise
+        with PygameWindow() as window:
+            pen: VirtualSurfacePen = generate(
+                window=window,
+                generator=gen_map[self.generator_choicebox.get()],
+                random_seed=int(self.seedvar.get()),
+                speed_factor=self.speed_slider.get() / 100,
+                nrows=int(self.height_slider.get()),
+                ncols=int(self.width_slider.get()),
+                visualize=self.visualize_gen_var.get(),
+                cell_width=int(self.cell_width_slider.get()),
+            )
+            if True:  # TODO
+                solver = solver_map[self.solver_choicebox.get()]
+                solver.solve(pen)
 
-
-
-    def launch_pygame(self):
-        pygame_pen = generate(
-            generator=gen_map[self.generator_choicebox.get()],
-            random_seed=int(self.seedvar.get()),
-            speed_factor=self.speed_slider.get() / 100,
-            nrows=int(self.height_slider.get()),
-            ncols=int(self.width_slider.get()),
-            visualize=self.visualize_gen_var.get(),
-            cell_width=int(self.cell_width_slider.get()),
-        )
-        if True:  # TODO
-            solver = solver_map[self.solver_choicebox.get()]
-            solver.solve(pygame_pen)
-
-        pygame_pen.loop_until_exit()
-
+            pen.loop_until_exit()

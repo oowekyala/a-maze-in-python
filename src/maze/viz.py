@@ -121,11 +121,16 @@ class GridPen(metaclass=ABCMeta):
 
 
     @staticmethod
-    def noop_pen(maze: Maze) -> 'GridPen':
+    def noop_pen(maze: Maze, tick_function: Callable = lambda: None) -> 'GridPen':
         class __NoopPen(GridPen):
 
             def __init__(self):
                 super().__init__(maze)
+
+
+            def tick_frame(self, *args, **kwargs):
+                tick_function()
+
 
             def update_cells(self, *args, **kwargs) -> None:
                 pass
