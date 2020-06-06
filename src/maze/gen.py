@@ -43,7 +43,7 @@ def apply_gen(gen: GenerationAlgo, pen: GridPen):
     pen.draw_entire_maze(cell_state=state, is_walled=is_walled)
 
     gen.generate(pen=pen)
-    pen.tick_frame(gen)
+    pen.tick_frame(gen, force_refresh=True)
 
 
 
@@ -199,7 +199,7 @@ class PrimGenerate(GenerationAlgo):
             else:
                 pen.update_walls(wall)  # Remove ACTIVE status
 
-            pen.tick_frame(self, frontier_size=len(walls))
+            pen.tick_frame(self)
 
 
 

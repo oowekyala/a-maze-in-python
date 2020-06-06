@@ -116,12 +116,13 @@ class VirtualSurfacePen(GridPen):
 
     def __init__(self, maze: Maze,
                  backend: PygameWindow,
-                 speed_factor: float = 1.0,
                  cell_width=6,
                  cell_margin=0):
         super().__init__(maze)
 
-        self.speed_factor = speed_factor  # this uses the custom setter
+        self.speed_factor = 1.0  # this uses the custom setter
+        self.__tick_count = 0
+        self.__overclock = 1
 
         self.cell_width = cell_width
         self.cell_margin = cell_margin
@@ -175,26 +176,29 @@ class VirtualSurfacePen(GridPen):
         return (2 * dim + 1) * (inc + self.cell_margin) + self.cell_margin * 2
 
 
-    def tick_frame(self, algo_instance, frontier_size=1):
-        frontier_size = max(frontier_size, 1)
-        tick_weight = 1
-        if frontier_size != 1 and self.speed_factor > .30 and frontier_size / self.maze.num_cells >= 0.2:
-            #  algo_tick slows down BFS-type algorithms (eg Prim), where the algo advances a whole
-            #  frontier. A tick is registered for each member of the frontier, so as the frontier grows,
-            #  it hits the framerate limit much earlier than algos like DFS, which have a single cell as
-            #  frontier
+    def tick_frame(self, algo_instance, force_refresh=False):
+        self.__tick_count += 1
+        if force_refresh or self.__tick_count % self.__overclock == 0:
 
-            tick_weight = 5
+            if self.__global_update:
+                self.__backend.update_grid(grid_surf=self.__grid_surface, dirty=None)
+            elif self.__dirty:
+                self.__backend.update_grid(grid_surf=self.__grid_surface, dirty=self.__dirty)
 
-        if self.__global_update:
-            self.__backend.update_grid(grid_surf=self.__grid_surface, dirty=None)
-        elif self.__dirty:
-            self.__backend.update_grid(grid_surf=self.__grid_surface, dirty=self.__dirty)
+            self.__dirty = None
+            self.__backend.handle_window_events()
+            if self.speed_factor < 1.0:
+                self.__backend.clock.tick(self.__algo_framerate)
 
-        self.__dirty = None
-        self.__backend.handle_window_events()
-        if self.speed_factor < 1.0:
-            self.__backend.clock.tick(tick_weight * self.__algo_framerate)
+
+    @property
+    def overclock(self):
+        return self.overclock
+
+
+    @overclock.setter
+    def overclock(self, ov: int):
+        self.__overclock = min(max(ov, 1), 8)
 
 
     @property
@@ -205,12 +209,13 @@ class VirtualSurfacePen(GridPen):
     @speed_factor.setter
     def speed_factor(self, sf: float):
         # A maze with many cells will show a higher framerate than a smaller maze for the same speed factor
-        # Otherwise some algorithms would be impossibly slow in big mazes
+        # Otherwise some algorithms would be too slow in big mazes
         # The perceived "speed" depends on the algorithm
         self.__speed_factor = max(sf, 0.01)
         # Requirements, for any maze size:
         # - at > 30% speed_factor, we want the framerate to be fluid (>= 20)
-        # - at the highest speed_factor, we want that any maze be generated in under 15 seconds (for linear generators)
+        # - at 100% speed_factor, we want every algo frame to be displayed, but run as fast as possible
+        # - TODO at > 100% we want to skip frame refreshes
 
         if self.speed_factor <= SPEED_FACTOR_RT_CUT:
             # under 30%
@@ -297,31 +302,10 @@ class VirtualSurfacePen(GridPen):
         if self.maze.mod_count != 0 or not is_walled:
             self.update_walls(*self.maze.distinct_walls(on=False), global_update=True)
 
-        self.tick_frame(self)
+        self.tick_frame(self, force_refresh=True)
 
     def loop_until_exit(self):
         self.__backend.loop_until_exit()
-
-
-
-def generate(generator,
-             nrows: int,
-             ncols: int,
-             window: PygameWindow,
-             random_seed: int = random.randint(0, 100_000),
-             cell_width=6,
-             speed_factor: float = 1.0,
-             visualize=True) -> VirtualSurfacePen:
-
-    maze = Maze(nrows=nrows, ncols=ncols, random_seed=random_seed)
-    pygame_pen = VirtualSurfacePen(maze, backend=window, speed_factor=speed_factor, cell_width=cell_width)
-    if visualize:
-        apply_gen(generator, pen=pygame_pen)
-    else:
-        apply_gen(generator, pen=GridPen.noop_pen(maze, tick_function=window.handle_window_events))
-        pygame_pen.draw_entire_maze(cell_state=CellState.NORMAL)
-
-    return pygame_pen
 
 
 
@@ -332,12 +316,15 @@ def do_pygame(generator,
               random_seed: int = random.randint(0, 100_000),
               cell_width=6,
               speed_factor: float = 1.0,
+              overclock: int = 1,
               visualize=True):
     with PygameWindow() as window:
         pen = None
         try:
             maze = Maze(nrows=nrows, ncols=ncols, random_seed=random_seed)
-            pen = VirtualSurfacePen(maze, backend=window, speed_factor=speed_factor, cell_width=cell_width)
+            pen = VirtualSurfacePen(maze, backend=window, cell_width=cell_width)
+            pen.overclock = overclock
+            pen.speed_factor = speed_factor
             if visualize:
                 apply_gen(generator, pen=pen)
             else:
@@ -345,6 +332,8 @@ def do_pygame(generator,
                 pen.draw_entire_maze(cell_state=CellState.NORMAL)
 
             solver.solve(pen)
+
+            pen.tick_frame(None, force_refresh=True)
         except Exception as ex:
             if isinstance(ex, WindowTermination):
                 raise
@@ -492,8 +481,13 @@ class ControlPanel(object):
         self.visualize_gen_var = checkbox(label_text="See generation?", default=True)
 
         row += 1
-        row_label(text="Speed")
         self.speed_slider = slider(label_text="Speed", from_=1, to=100, default=100, unit=" %")
+
+        row += 1
+        self.overclock_slider = slider(label_text="Frame skip", from_=1, to=8, default=1, unit="x")
+
+        row += 1
+        ttk.Separator(self.root).grid(row=row, column=0, columnspan=3)
 
         row += 1
         go_button = tk.Button(self.root, text="Go", command=self.go_button_press, background="lightyellow")
@@ -507,6 +501,7 @@ class ControlPanel(object):
             generator=gen_map[self.generator_choicebox.get()],
             random_seed=int(self.seedvar.get()),
             speed_factor=self.speed_slider.get() / 100,
+            overclock=int(self.overclock_slider.get()),
             nrows=int(self.height_slider.get()),
             ncols=int(self.width_slider.get()),
             visualize=self.visualize_gen_var.get(),
