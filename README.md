@@ -11,15 +11,17 @@ Supports the following algorithms:
 
 #### DFS
 
+#### Eller
+
 #### Kruskal
-
-#### Wilson
-
-#### Recursive division
 
 #### Prim
 
+#### Recursive division
+
 #### Sidewinder
+
+#### Wilson
 
 
 

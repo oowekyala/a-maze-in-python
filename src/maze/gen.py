@@ -1,5 +1,5 @@
 from abc import abstractmethod, ABCMeta
-from typing import List, NamedTuple
+from typing import List, NamedTuple, Set
 from enum import Enum, auto
 
 from maze.viz import *
@@ -384,10 +384,18 @@ class SidewinderGenerate(GenerationAlgo):
 
 
 
-class KruskalTree(object):
+class _KruskalConnectedComp(object):
+    """Data structure used to keep track of connectivity between cells.
+       2 cells are connected if their KTree share the same root.
+
+       This needs fast is_connected, and connect. This implementation is
+       amortized O(1) for both, I think (paths to the root are explored
+       at most once, the __root is relinked for subsequent uses).
+    """
+
 
     def __init__(self):
-        self.__root: KruskalTree = self
+        self.__root: _KruskalConnectedComp = self
 
 
     def root(self, replacement=None):
@@ -406,13 +414,12 @@ class KruskalTree(object):
         return r
 
 
-    def is_connected(self, tree: 'KruskalTree'):
+    def is_connected(self, tree: '_KruskalConnectedComp'):
         return self is tree or self.root() is tree.root()
 
 
-    def connect(self, tree: 'KruskalTree'):
+    def connect(self, tree: '_KruskalConnectedComp'):
         tree.root(replacement=self)
-
 
 
 class KruskalGenerate(GenerationAlgo):
@@ -430,10 +437,10 @@ class KruskalGenerate(GenerationAlgo):
         maze.random.shuffle(edges)
 
         # 2D array of tree sets
-        sets = [[KruskalTree() for _ in range(maze.ncols)] for _ in range(maze.nrows)]
+        sets = [[_KruskalConnectedComp() for _ in range(maze.ncols)] for _ in range(maze.nrows)]
 
 
-        def set_of(cell) -> KruskalTree:
+        def set_of(cell) -> _KruskalConnectedComp:
             return sets[cell.row][cell.col]
 
 
@@ -451,3 +458,145 @@ class KruskalGenerate(GenerationAlgo):
                 pen.update_cells(wall.cell, wall.next_cell, state=CellState.NORMAL)
 
                 pen.tick_frame(self)
+
+
+
+from pyrsistent import PSet, pset, s
+import pyrsistent
+
+
+
+class _EllerConnectedComp(_KruskalConnectedComp):
+    """
+    One connected component for the eller algorithm. This only cares for one
+    row at a time. It needs fast enumeration of all cells in the CC, a fast
+    inclusion test, and fast merge operation.
+    """
+
+
+    def __init__(self):
+        super().__init__()
+        self.__cells: List[Cell] = []
+
+
+    def add(self, item: Cell):
+        self.__cells.append(item)
+
+
+    def connect(self, other: '_EllerConnectedComp'):
+        # after this, other has a reference to self, not the reverse
+        super().connect(other)
+        self.__cells.extend(other.__cells)
+        other.__cells = self.__cells
+
+
+    def cells_in_row(self):
+        return self.__cells
+
+
+    def clear_row(self):
+        self.__cells.clear()
+
+
+
+class EllerGen(GenerationAlgo):
+
+    def generate(self, pen: GridPen) -> None:
+        maze = pen.maze
+        random = maze.random
+
+        # all edges of the maze
+        edges = [
+            w
+            for cell in maze.all_cells()
+            for w in [cell.wall(Side.WEST), cell.wall(Side.NORTH)]
+        ]
+
+        maze.random.shuffle(edges)
+
+        # elements are the connected component of the cell
+        cur_row: List[_EllerConnectedComp] = [_EllerConnectedComp() for _ in range(maze.ncols)]
+        next_row: List[Optional[_EllerConnectedComp]] = [None for _ in range(maze.ncols)]
+
+        for row in range(maze.nrows):
+
+            # randomly break east walls in the same row
+            for col in range(maze.ncols - 1):
+                cur_cell = Cell(row, col)
+
+                pen.update_cells(cur_cell, state=CellState.NORMAL)
+
+                cur_cc = cur_row[col]
+                next_cc = cur_row[col + 1]
+
+                cur_cc.add(cur_cell)
+                if cur_cc.is_connected(next_cc):
+                    if cur_cc is not next_cc:
+                        cur_row[col + 1] = cur_cc  # remove subcomponents, they don't matter
+                elif row == maze.nrows - 1 or random.randint(0, 1):
+                    _break_wall(cur_cell.wall(Side.EAST), pen)
+                    cur_cc.connect(next_cc)
+                    cur_row[col + 1] = cur_cc  # remove subcomponents, they don't matter
+
+                pen.tick_frame(self)
+
+            # handle last cell in row
+            last_cell = Cell(row, maze.ncols - 1)
+            cur_row[maze.ncols - 1].add(last_cell)
+            pen.update_cells(last_cell, state=CellState.NORMAL)
+
+            pen.tick_frame(self)
+
+            if row == maze.nrows - 1:
+                break
+
+            # break some vertical walls to connect this row to the next
+            done_cc = set([])
+
+            for col in range(maze.ncols):
+                cur_cc = cur_row[col]
+
+                if cur_cc.root() not in done_cc:
+                    done_cc.add(cur_cc.root())
+
+                    cc_cells_in_row = cur_cc.cells_in_row()
+
+                    # break at least 1 wall
+                    for c in random.sample(cc_cells_in_row, random.randint(1, len(cc_cells_in_row))):
+                        _break_wall(c.wall(Side.SOUTH), pen)
+                        next_row[c.col] = cur_cc
+                        pen.tick_frame(self)
+
+                    cur_cc.clear_row()
+
+            # finish the row by assigning fresh CCs to the next rows
+            for col in range(maze.ncols):
+                if not next_row[col]:
+                    next_row[col] = _EllerConnectedComp()
+
+            tmp = cur_row
+            cur_row = next_row
+            next_row = tmp
+            for col in range(maze.ncols):
+                next_row[col] = None
+
+        # last row: connect every disjoint CC
+        row = maze.nrows - 1
+        for col in range(maze.ncols - 1):
+            cur_cell = Cell(row, col)
+
+            pen.update_cells(cur_cell, state=CellState.NORMAL)
+
+            cur_cc = cur_row[col]
+            next_cc = cur_row[col + 1]
+
+            cur_cc.add(cur_cell)
+            if cur_cc.is_connected(next_cc):
+                if cur_cc is not next_cc:
+                    cur_row[col + 1] = cur_cc  # remove subcomponents, they don't matter
+            elif random.randint(0, 1):
+                _break_wall(cur_cell.wall(Side.EAST), pen)
+                cur_cc.connect(next_cc)
+                cur_row[col + 1] = cur_cc  # remove subcomponents, they don't matter
+
+            pen.tick_frame(self)

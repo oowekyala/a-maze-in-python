@@ -329,11 +329,11 @@ class Maze(object):
 
     def __str__(self):
         res = ""
-        for row in range(0, self.nrows):
+        for row in range(self.nrows):
             hline = "   "
             vline = "   "
 
-            for col in range(0, self.ncols):
+            for col in range(self.ncols):
                 cell = Cell(row, col)
                 has_top = cell in self.__walls[Side.NORTH]
                 has_left = cell in self.__walls[Side.WEST]

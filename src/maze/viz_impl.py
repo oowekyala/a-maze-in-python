@@ -3,7 +3,7 @@ from typing import Dict
 from pygame import Rect, Surface
 import pygame
 
-import random
+import random, traceback
 
 from maze.viz import *
 from maze.gen import *
@@ -81,6 +81,7 @@ class PygameWindow(object):
 
     def handle_window_events(self):
         """Process pygame events. Done on frame ticks, as control flow belongs to the algo in that case"""
+        pygame.event.pump()
         if pygame.event.get(eventtype=pygame.QUIT):
             raise WindowTermination()
 
@@ -324,9 +325,41 @@ def generate(generator,
 
 
 
+def do_pygame(generator,
+              nrows: int,
+              ncols: int,
+              solver: SolverAlgo,
+              random_seed: int = random.randint(0, 100_000),
+              cell_width=6,
+              speed_factor: float = 1.0,
+              visualize=True):
+    with PygameWindow() as window:
+        pen = None
+        try:
+            maze = Maze(nrows=nrows, ncols=ncols, random_seed=random_seed)
+            pen = VirtualSurfacePen(maze, backend=window, speed_factor=speed_factor, cell_width=cell_width)
+            if visualize:
+                apply_gen(generator, pen=pen)
+            else:
+                apply_gen(generator, pen=GridPen.noop_pen(maze, tick_function=window.handle_window_events))
+                pen.draw_entire_maze(cell_state=CellState.NORMAL)
+
+            solver.solve(pen)
+        except Exception as ex:
+            if isinstance(ex, WindowTermination):
+                raise
+            else:
+                print(traceback.format_exc())
+
+        if pen:
+            pen.loop_until_exit()
+
+
+
 gen_map = {
     "DFS": DfsGenerate(),
     "Wilson": WilsonGenerate(),
+    "Eller": EllerGen(),
     "No walls": BlankGen(),
     "Prim": PrimGenerate(),
     "Rec. division": RecursiveDivisionGenerate(),
@@ -470,19 +503,13 @@ class ControlPanel(object):
 
 
     def go_button_press(self):
-        with PygameWindow() as window:
-            pen: VirtualSurfacePen = generate(
-                window=window,
-                generator=gen_map[self.generator_choicebox.get()],
-                random_seed=int(self.seedvar.get()),
-                speed_factor=self.speed_slider.get() / 100,
-                nrows=int(self.height_slider.get()),
-                ncols=int(self.width_slider.get()),
-                visualize=self.visualize_gen_var.get(),
-                cell_width=int(self.cell_width_slider.get()),
-            )
-            if True:  # TODO
-                solver = solver_map[self.solver_choicebox.get()]
-                solver.solve(pen)
-
-            pen.loop_until_exit()
+        do_pygame(
+            generator=gen_map[self.generator_choicebox.get()],
+            random_seed=int(self.seedvar.get()),
+            speed_factor=self.speed_slider.get() / 100,
+            nrows=int(self.height_slider.get()),
+            ncols=int(self.width_slider.get()),
+            visualize=self.visualize_gen_var.get(),
+            cell_width=int(self.cell_width_slider.get()),
+            solver=solver_map[self.solver_choicebox.get()]
+        )
