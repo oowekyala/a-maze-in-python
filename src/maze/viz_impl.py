@@ -75,6 +75,7 @@ class PygameWindow(object):
 
     def loop_until_exit(self):
         while True:
+            pygame.event.pump()
             self.handle_window_events()
             self.clock.tick(60)
 
@@ -363,6 +364,7 @@ solver_map = {
     "Dead-end filler": DeadEndFillingSolver(),
     "Right-hand rule": HandRuleSolver(is_right_hand_rule=True),
     "Left-hand rule": HandRuleSolver(is_right_hand_rule=False),
+    "No solver": NoSolver()
 }
 
 solvers_key_list = list(solver_map.keys())

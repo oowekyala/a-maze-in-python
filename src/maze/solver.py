@@ -85,6 +85,11 @@ class ShuffleHeuristic(Heuristic):
         return walls.pop(i), walls
 
 
+class NoSolver(SolverAlgo):
+
+    def solve(self, pen: GridPen) -> None:
+        pass
+
 
 class DfsSolver(SolverAlgo):
 

@@ -460,12 +460,6 @@ class KruskalGenerate(GenerationAlgo):
                 pen.tick_frame(self)
 
 
-
-from pyrsistent import PSet, pset, s
-import pyrsistent
-
-
-
 class _EllerConnectedComp(_KruskalConnectedComp):
     """
     One connected component for the eller algorithm. This only cares for one
