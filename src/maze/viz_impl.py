@@ -332,6 +332,10 @@ def do_pygame(generator,
                 apply_gen(generator, pen=GridPen.noop_pen(maze, tick_function=window.handle_window_events))
                 pen.draw_entire_maze(cell_state=CellState.NORMAL)
 
+
+            import time
+            time.sleep(2)
+
             solver.solve(pen)
 
             pen.tick_frame(None, force_refresh=True)

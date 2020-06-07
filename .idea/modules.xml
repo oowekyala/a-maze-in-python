@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/python-fiddle.iml" filepath="$PROJECT_DIR$/python-fiddle.iml" />
+      <module fileurl="file://$PROJECT_DIR$/maze-pie.iml" filepath="$PROJECT_DIR$/maze-pie.iml" />
     </modules>
   </component>
 </project>
