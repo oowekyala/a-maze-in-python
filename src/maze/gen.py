@@ -170,6 +170,7 @@ class PrimGenerate(GenerationAlgo):
 
         seed = maze.rand_cell()
         walls = set(walls_around(seed))
+        pen.update_cells(seed, state=CellState.NORMAL)
         pen.update_walls(*walls, state=CellState.ACTIVE)
 
         visited += seed
