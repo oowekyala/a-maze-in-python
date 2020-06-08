@@ -1,8 +1,12 @@
-## Maze visualization with Python
+# Mazepie: maze visualization in Python
 
-A playground to visualize maze generation and maze solving 
-algorithms. It's my first project in Python. This uses Pygame
-to render mazes and Tkinter for the main panel.
+Nothing groundbreaking here, just a toy project to teach myself
+Python. This uses Pygame to render mazes and Tkinter for the control panel.
+
+You can see nice gifs of the supported generators/solvers below. The gifs
+are slowed down, the algorithms perform well even on big mazes. There
+are several options to control execution speed directly from the control
+panel (slow down/speed up execution).
 
 Only tested under Ubuntu 18.04. You need pygame, tkinter, and Python >= 3.6 
 
