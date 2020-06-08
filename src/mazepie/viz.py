@@ -1,7 +1,7 @@
 from abc import abstractmethod, ABCMeta
 from typing import Callable, Dict, TypeVar
 from enum import Enum, auto, unique
-from maze.model import *
+from mazepie.model import *
 
 
 

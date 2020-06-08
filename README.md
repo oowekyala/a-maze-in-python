@@ -1,13 +1,19 @@
 ## Maze visualization with Python
 
-This project is a playground to visualize maze generation and
-maze solving algorithms. It's my first project in Python.
+A playground to visualize maze generation and maze solving 
+algorithms. It's my first project in Python. This uses Pygame
+to render mazes and Tkinter for the main panel.
 
+Only tested under Ubuntu 18.04. You need pygame, tkinter, and Python >= 3.6 
+
+Running in Bash:
+
+```bash
+$ PYTHONPATH="$(pwd)/src" python3 -m mazepie
+```
 
 
 ### Maze generators
-
-Supports the following algorithms:
 
 #### DFS
 

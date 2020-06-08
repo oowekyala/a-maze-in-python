@@ -5,10 +5,10 @@ import pygame
 
 import random, traceback
 
-from maze.viz import *
-from maze.gen import *
-from maze.solver import *
-from maze.model import *
+from mazepie.viz import *
+from mazepie.gen import *
+from mazepie.solver import *
+from mazepie.model import *
 
 @unique
 class Color(Enum):

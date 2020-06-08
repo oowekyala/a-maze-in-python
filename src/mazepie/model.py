@@ -1,6 +1,6 @@
 import textwrap
 from enum import Enum, unique, auto
-from typing import NamedTuple, Optional, Union, Iterable, Any
+from typing import NamedTuple, Optional, Union, Iterable, Any, List
 from bitarray import bitarray
 from bitarray.util import rindex
 from copy import copy
@@ -251,7 +251,17 @@ class Maze(object):
         return Cell.CellSet.with_initial(height=self.nrows, width=self.ncols, initial_value=initial_value)
 
 
-    def walls_around(self, cell: Cell, except_sides: Iterable[Side] = (), only_passages=False, blacklist=None):
+    def walls_around(self, cell: Cell, except_sides: Iterable[Side] = (), only_passages=False, blacklist=None) -> List[Wall]:
+        """
+        Returns the walls surrounding the given cell. By default doesn't check whether the wall is
+        up or down, just checks that the wall does not lead out of the labyrinth (next_cell in maze).
+
+        :param cell: Cell
+        :param except_sides: Don't consider sides found in this iterable
+        :param only_passages: Filter to return only walls that are down
+        :param blacklist: Exclude walls if their next_cell is in this CellSet
+        :return:
+        """
         return [w
                 for s in list(Side)
                 if s not in except_sides
