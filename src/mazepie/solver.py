@@ -20,6 +20,8 @@ class SolverAlgo(metaclass=ABCMeta):
 
 
 
+# TODO remove this shit
+# TODO A*
 class Heuristic(metaclass=ABCMeta):
 
     @abstractmethod

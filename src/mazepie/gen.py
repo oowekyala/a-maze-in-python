@@ -387,7 +387,7 @@ class SidewinderGenerate(GenerationAlgo):
 
 class _KruskalConnectedComp(object):
     """Data structure used to keep track of connectivity between cells.
-       2 cells are connected if their KTree share the same root.
+       2 cells are connected if their KTrees share the same root.
 
        This needs fast is_connected, and connect. This implementation is
        amortized O(1) for both, I think (paths to the root are explored
