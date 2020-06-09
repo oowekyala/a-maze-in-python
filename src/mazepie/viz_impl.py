@@ -1,47 +1,51 @@
-from typing import Dict
-
 from pygame import Rect, Surface
+from pygame.color import Color
 import pygame
 
 import random, traceback
 
-from mazepie.viz import *
 from mazepie.gen import *
 from mazepie.solver import *
 from mazepie.model import *
 
-@unique
-class Color(Enum):
-    BLACK = pygame.Color("black")
-    WHITE = pygame.Color("white")
-    GREEN = pygame.Color(133, 223, 38)
-    RED = pygame.Color("red")
-    BLUE = pygame.Color(5, 103, 173)
-    ORANGE = pygame.Color("orange")
-    PURPLE = pygame.Color("purple")
-    YELLOW = pygame.Color(237, 207, 84)
-    GREY = pygame.Color("darkslategrey")
-    BROWN = pygame.Color("brown")
-
-
-def conv_color(color: Color) -> pygame.Color:
-    return color.value
+BLACK = Color("black")
+WHITE = Color("white")
+GREEN = Color(133, 223, 38)
+RED = Color("red")
+BLUE = Color(5, 103, 173)
+ORANGE = Color("orange")
+PURPLE = Color("purple")
+YELLOW = Color(237, 207, 84)
+GREY = Color("darkslategrey")
+BROWN = Color("brown")
 
 
 
-CORRIDOR_COLOR = Color.WHITE
-WALL_COLOR = Color.BLACK
+def color_lerp(_from: Color, to: Color, stop: float) -> Color:
+    """Linear interpolation of colors. stop is [0,1]. This function was added in pygame 2.0.0, still in development"""
+
+    r = int(_from.r * (1 - stop) + to.r * stop)
+    g = int(_from.g * (1 - stop) + to.g * stop)
+    b = int(_from.b * (1 - stop) + to.b * stop)
+    a = int(_from.a * (1 - stop) + to.a * stop)
+
+    return Color(r, g, b, a)
+
+
+
+CORRIDOR_COLOR = WHITE
+WALL_COLOR = BLACK
 
 cell_colors: Dict[CellKind, Dict[CellState, Color]] = {
     CellKind.REGULAR: {
-        CellState.ACTIVE: Color.GREEN,
-        CellState.IGNORED: Color.YELLOW,
-        CellState.BEST_PATH: Color.BLUE,
+        CellState.ACTIVE: GREEN,
+        CellState.IGNORED: YELLOW,
+        CellState.BEST_PATH: BLUE,
         CellState.NORMAL: CORRIDOR_COLOR,
-        CellState.UNDISCOVERED: Color.GREY
+        CellState.UNDISCOVERED: GREY
     },
-    CellKind.START: {s: Color.RED for s in list(CellState)},
-    CellKind.END: {s: Color.RED for s in list(CellState)},
+    CellKind.START: {s: RED for s in list(CellState)},
+    CellKind.END: {s: RED for s in list(CellState)},
 }
 
 cell_colors[CellKind.WALL_OFF] = {**cell_colors[CellKind.REGULAR], CellState.UNDISCOVERED: WALL_COLOR}
@@ -50,6 +54,17 @@ cell_colors[CellKind.WALL_ON] = {**cell_colors[CellKind.WALL_OFF], CellState.NOR
 # below this limit (inclusive), the speed factor is an actual framerate cap
 # above, it depends on the algo/maze size
 SPEED_FACTOR_RT_CUT = .3
+
+
+
+def color_boomerang(_from: Color, to: Color, len: int):
+    return [color_lerp(_from=_from, to=to, stop=i / len) for i in range(0, len)] + \
+           [color_lerp(_from=to, to=_from, stop=i / len) for i in range(0, len)]  # reversed gradient
+
+
+
+GRADIENT_LEN = 100  # needs to be even (divided below)
+ACTIVE_GRADIENT: List[Color] = color_boomerang(_from=RED, to=GREEN, len=(GRADIENT_LEN // 2))
 
 
 
@@ -228,24 +243,34 @@ class VirtualSurfacePen(GridPen):
     def update_walls(self,
                      *walls: Wall,
                      state: CellState = CellState.NORMAL,
-                     global_update: bool = False) -> None:
+                     global_update: bool = False,
+                     gradient=0) -> None:
 
         def get_color(wall: Wall):
             kind = CellKind.WALL_ON if self.maze.has_wall(wall) else CellKind.WALL_OFF
-            return cell_colors[kind][state]
+            if state == CellState.ACTIVE and kind == CellKind.WALL_OFF and gradient > 0:
+                return ACTIVE_GRADIENT[gradient % GRADIENT_LEN]
+            else:
+                return cell_colors[kind][state]
 
 
         self._batched_update(walls, get_color, get_rect=self._wall_rect, global_update=global_update)
 
 
-    def update_cells(self, *cells: Cell, state: CellStateSelector, global_update: bool = False) -> None:
+    def update_cells(self, *cells: Cell, state: CellStateSelector, global_update: bool = False, gradient=0) -> None:
 
         sel = state_selector(state)
 
 
         def get_color(cell: Cell):
-            s = sel(cell)
-            return cell_colors[self.get_kind(cell)][s] if s else None
+            s: CellState = sel(cell)
+            kind = self.get_kind(cell)
+            if s == CellState.ACTIVE and kind == CellKind.REGULAR and gradient > 0:
+                return ACTIVE_GRADIENT[gradient % GRADIENT_LEN]
+            elif s:
+                return cell_colors[kind][s]
+            else:
+                return None
 
 
         self._batched_update(cells, get_color, get_rect=self._cell_rect, global_update=global_update)
@@ -269,7 +294,7 @@ class VirtualSurfacePen(GridPen):
                 continue
 
             rect = get_rect(cell)
-            pygame.draw.rect(self.__grid_surface, conv_color(color), rect)
+            pygame.draw.rect(self.__grid_surface, color, rect)
 
             if not self.__global_update:
                 if dirty:
@@ -296,7 +321,7 @@ class VirtualSurfacePen(GridPen):
 
 
     def draw_entire_maze(self, cell_state: CellState, is_walled: bool = True):
-        self.__grid_surface.fill(conv_color(WALL_COLOR))
+        self.__grid_surface.fill(WALL_COLOR)
 
         self.update_cells(*self.maze.all_cells(), state=cell_state, global_update=True)
 
@@ -362,6 +387,7 @@ gen_map = {
 }
 
 solver_map = {
+    "A*": AStarSolver(),
     "DFS (Manhattan heuristic)": DfsSolver(heuristic=ManhattanDistance()),
     "DFS (no heuristic)": DfsSolver(heuristic=NoHeuristic()),
     "BFS": BfsSolver(),

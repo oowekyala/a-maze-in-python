@@ -56,12 +56,6 @@ class GridPen(metaclass=ABCMeta):
         return self.__maze
 
 
-    def update_walls(self,
-                     *walls: Wall,
-                     state: CellState = CellState.NORMAL,
-                     global_update: bool = False) -> None:
-        pass
-
 
     def tick_frame(self, algo_instance, force_refresh=False):
         """Record one step in the algorithm currently executing.
@@ -73,13 +67,23 @@ class GridPen(metaclass=ABCMeta):
          """
         pass
 
-    def paint_wall_path(self, *walls: Wall, state: CellState):
-        self.update_cells(*[w.next_cell for w in walls], state=state)
-        self.update_walls(*walls, state=state)
+
+    def paint_wall_path(self, *walls: Wall, state: CellState, gradient=0):
+        """
+        Paint a set of walls and their next cells.
+        :param walls: Walls
+        :param state: State
+        :param gradient: An int, only applicable to ACTIVE state
+        :return:
+        """
+        self.update_cells(*[w.next_cell for w in walls], state=state, gradient=gradient)
+        self.update_walls(*walls, state=state, gradient=gradient)
 
 
-    def update_cells(self, *cells: Cell, state: CellStateSelector, global_update: bool = False) -> None:
-        """Batch update"""
+    def update_walls(self, *walls: Wall, state: CellState = CellState.NORMAL, global_update: bool = False, gradient=0) -> None:
+        pass
+
+    def update_cells(self, *cells: Cell, state: CellStateSelector, global_update: bool = False, gradient=0) -> None:
         pass
 
 

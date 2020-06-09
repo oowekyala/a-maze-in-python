@@ -81,6 +81,10 @@ $ PYTHONPATH="$(pwd)/src" python3 -m mazepie
 
 ### Maze solvers
 
+#### A*
+
+![Gif](gifs/solvers/a_star.gif)
+
 #### DFS
 
 <details>

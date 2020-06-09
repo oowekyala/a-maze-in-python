@@ -1,8 +1,9 @@
 from mazepie.model import *
 from mazepie.viz import *
 from random import Random
-from typing import Callable, List, Tuple, NamedTuple, Set
+from typing import Callable, List, Tuple, NamedTuple, Set, Generic, TypeVar
 from collections import namedtuple
+from queue import PriorityQueue
 from abc import abstractmethod, ABCMeta
 
 
@@ -273,3 +274,81 @@ class DeadEndFillingSolver(SolverAlgo):
 
         # use the dfs solver to trace the best path
         DfsSolver(heuristic=NoHeuristic()).solve(pen, visited=filled)
+
+
+
+Infty = 2 ** 10_000
+
+
+
+class AStarSolver(SolverAlgo):
+
+    def solve(self, pen: GridPen) -> None:
+        maze = pen.maze
+        h: Callable[[Cell], int] = lambda c: ManhattanDistance.manhattan(maze.end_cell, c)
+
+        open_set = PriorityQueue()
+
+        # For node n, cameFrom[n] is the wall immediately preceding it on the cheapest path from start
+        # to n currently known.
+        came_from: Dict[Cell, Wall] = {}
+        # For node n, g_score[n] is the cost of the cheapest path from start to n currently known.
+        g_score = {maze.start_cell: 0}
+
+        # For node n, f_score[n] := g_score[n] + h(n). f_score[n] represents our current best guess as to
+        # how short a path from start to finish can be if it goes through n.
+        f_score = {maze.start_cell: h(maze.start_cell)}
+
+
+        def edge_weight(wall: Wall) -> int:
+            return 1 if not maze.has_wall(wall) else Infty
+
+
+        def paint_path(current: Cell):
+            while current in came_from.keys():
+                # rebuilds the path in reverse
+                w: Wall = came_from[current]
+                pen.paint_wall_path(w, state=CellState.BEST_PATH)
+                current = w.cell
+                pen.tick_frame(self)
+
+            pen.update_cells(current, state=CellState.BEST_PATH)
+            pen.tick_frame(self)
+
+
+        def push(ncell: Cell):
+            f = f_score[ncell]
+            open_set.put((f, ncell))
+
+
+        def is_not_in_open_set(cell: Cell):
+            for (_, c) in open_set.queue:
+                if c == cell:
+                    return False
+
+            return True
+
+
+        push(maze.start_cell)
+
+        while open_set.qsize() > 0:
+            (cur_f_score, cur) = open_set.get()
+            if cur == maze.end_cell:
+                paint_path(cur)
+                break
+
+            walls = maze.walls_around(cur)
+
+            for wall in walls:
+                neighbor = wall.next_cell
+                # tentative_gScore is the distance from start to the neighbor through current
+                tentative_g_score = g_score.get(cur, Infty) + edge_weight(wall)
+                if tentative_g_score < g_score.get(neighbor, Infty):
+                    # This path to neighbor is better than any previous one. Record it!
+                    came_from[neighbor] = wall
+                    g_score[neighbor] = tentative_g_score
+                    f_score[neighbor] = g_score.get(neighbor, Infty) + h(neighbor)
+                    if is_not_in_open_set(neighbor):
+                        push(neighbor)
+                        pen.paint_wall_path(wall, state=CellState.ACTIVE, gradient=f_score[neighbor])
+                        pen.tick_frame(self)
