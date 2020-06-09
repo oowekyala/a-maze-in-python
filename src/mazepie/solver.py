@@ -197,7 +197,10 @@ class HandRuleSolver(SolverAlgo):
         maze = pen.maze
 
         cell = maze.start_cell
-        pen.update_cells(cell, state=CellState.BEST_PATH)
+        pen.update_cells(cell, state=CellState.ACTIVE)
+
+        # number of times the cell has been stepped on.
+        num_step = {cell: 1}
 
         # The orientation depends on the last turn you took
         # Eg if you're looking down (towards Side.SOUTH), your right-hand is at Side.WEST, your back is Side.NORTH, etc
@@ -217,6 +220,7 @@ class HandRuleSolver(SolverAlgo):
         num_sides = 4
         orientation = 0  # index in the list
 
+        path_len = 0
         while cell != maze.end_cell:
 
             next_wall = None
@@ -231,8 +235,15 @@ class HandRuleSolver(SolverAlgo):
 
             cell = next_wall.next_cell
 
-            pen.paint_wall_path(next_wall, state=CellState.BEST_PATH)
+            # c in {0,1,2,3}
+            # if c == 0, the cell is on the best path
+            c = num_step.get(cell, 0)
+            num_step[cell] = c + 1
+
+            state = CellState.BEST_PATH if c == 0 else CellState.IGNORED
+            pen.paint_wall_path(next_wall, bias_prev=True, state=state)
             pen.tick_frame(self)
+            path_len += 1
 
 
 

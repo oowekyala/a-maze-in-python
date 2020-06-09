@@ -117,7 +117,7 @@ $ PYTHONPATH="$(pwd)/src" python3 -m mazepie
 <details>
     <summary>Gif...</summary>
 
-![Gif](gifs/solvers/rhand_rule.gif)
+![Gif](gifs/solvers/lhand_rule.gif) ![Gif](gifs/solvers/rhand_rule.gif)
 
 </details>
 

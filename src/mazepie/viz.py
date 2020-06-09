@@ -68,7 +68,7 @@ class GridPen(metaclass=ABCMeta):
         pass
 
 
-    def paint_wall_path(self, *walls: Wall, state: CellState, gradient=0):
+    def paint_wall_path(self, *walls: Wall, state: CellState, bias_prev=False, gradient=0):
         """
         Paint a set of walls and their next cells.
         :param walls: Walls
@@ -76,7 +76,7 @@ class GridPen(metaclass=ABCMeta):
         :param gradient: An int, only applicable to ACTIVE state
         :return:
         """
-        self.update_cells(*[w.next_cell for w in walls], state=state, gradient=gradient)
+        self.update_cells(*[(w.cell if bias_prev else w.next_cell) for w in walls], state=state, gradient=gradient)
         self.update_walls(*walls, state=state, gradient=gradient)
 
 
