@@ -8,7 +8,8 @@ are slowed down, the algorithms perform well even on big mazes. There
 are several options to control execution speed directly from the control
 panel (slow down/speed up execution).
 
-Only tested under Ubuntu 18.04. You need pygame, tkinter, and Python >= 3.6 
+Only tested under Ubuntu 18.04. You need pygame, Pypy's bitarray module,
+tkinter, and Python >= 3.6 
 
 Running in Bash:
 
