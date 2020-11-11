@@ -4,9 +4,9 @@ import pygame
 
 import random, traceback
 
-from mazepie.gen import *
-from mazepie.solver import *
-from mazepie.model import *
+from amaze.gen import *
+from amaze.solver import *
+from amaze.model import *
 
 BLACK = Color("black")
 WHITE = Color("white")

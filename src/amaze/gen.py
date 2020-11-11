@@ -2,7 +2,7 @@ from abc import abstractmethod, ABCMeta
 from typing import List, NamedTuple, Set
 from enum import Enum, auto
 
-from mazepie.viz import *
+from amaze.viz import *
 
 
 

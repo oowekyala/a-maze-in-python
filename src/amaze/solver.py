@@ -1,5 +1,5 @@
-from mazepie.model import *
-from mazepie.viz import *
+from amaze.model import *
+from amaze.viz import *
 from random import Random
 from typing import Callable, List, Tuple, NamedTuple, Set, Generic, TypeVar
 from collections import namedtuple

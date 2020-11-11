@@ -1,7 +1,7 @@
-# Mazepie: maze visualization in Python
+# A maze in python
 
-Nothing groundbreaking here, just a toy project to teach myself
-Python. This uses Pygame to render mazes and Tkinter for the control panel.
+A toy project to teach myself Python. This uses Pygame to render mazes
+ and Tkinter for the control panel.
 
 You can see nice gifs of the supported generators/solvers below. The gifs
 are slowed down, the algorithms perform well even on big mazes. There
@@ -9,16 +9,20 @@ are several options to control execution speed directly from the control
 panel (slow down/speed up execution).
 
 Only tested under Ubuntu 18.04. You need pygame, Pypy's bitarray module,
-tkinter, and Python >= 3.6 
+tkinter, and Python >= 3.6:
+```bash
+sudo apt-get install python3-tk
+cat DEPENDENCIES | xargs pip3 install
+```
 
 Running in Bash:
 
 ```bash
-$ PYTHONPATH="$(pwd)/src" python3 -m mazepie
+PYTHONPATH="$(pwd)/src" python3 -m amaze
 ```
 
 
-### Maze generators
+## Maze generators
 
 #### DFS
 
@@ -80,7 +84,7 @@ $ PYTHONPATH="$(pwd)/src" python3 -m mazepie
 </details>
 
 
-### Maze solvers
+## Maze solvers
 
 #### A*
 
