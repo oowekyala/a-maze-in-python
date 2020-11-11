@@ -1,4 +1,4 @@
-# A maze in python
+# A maze: maze algorithm visualisation in Python
 
 A toy project to teach myself Python. This uses Pygame to render mazes
  and Tkinter for the control panel.
