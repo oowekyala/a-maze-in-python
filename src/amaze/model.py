@@ -1,3 +1,7 @@
+# Amaze - maze visualisation
+# Copyright (C) 2020 Clément Fournier
+# Some rights reserved. See LICENSE, or <https://www.gnu.org/licenses/gpl-3.0.html>
+
 import textwrap
 from enum import Enum, unique, auto
 from typing import NamedTuple, Optional, Union, Iterable, Any, List

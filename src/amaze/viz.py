@@ -1,3 +1,7 @@
+# Amaze - maze visualisation
+# Copyright (C) 2020 Clément Fournier
+# Some rights reserved. See LICENSE, or <https://www.gnu.org/licenses/gpl-3.0.html>
+
 from abc import abstractmethod, ABCMeta
 from typing import Callable, Dict, TypeVar
 from enum import Enum, auto, unique
