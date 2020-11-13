@@ -574,9 +574,9 @@ class EllerGen(GenerationAlgo):
                 if not next_row[col]:
                     next_row[col] = _EllerConnectedComp()
 
-            tmp = cur_row
-            cur_row = next_row
-            next_row = tmp
+
+            # swap
+            cur_row, next_row = next_row, cur_row
             for col in range(maze.ncols):
                 next_row[col] = None
 

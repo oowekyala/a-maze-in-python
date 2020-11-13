@@ -174,9 +174,7 @@ class BfsSolver(SolverAlgo):
                 pen.paint_wall_path(*queue2, state=CellState.BEST_PATH)
 
                 # swap queues
-                tmp = queue
-                queue = queue2
-                queue2 = tmp
+                queue, queue2 = queue2, queue
 
                 # algo ticks correspond to one step of the whole frontier
                 pen.tick_frame(self)
