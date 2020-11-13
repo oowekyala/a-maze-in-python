@@ -16,11 +16,12 @@ BLACK = Color("black")
 WHITE = Color("white")
 GREEN = Color(133, 223, 38)
 RED = Color("red")
-BLUE = Color(5, 103, 173)
+BLUE = Color(5, 127, 203)
 ORANGE = Color("orange")
 PURPLE = Color("purple")
 YELLOW = Color(237, 207, 84)
 GREY = Color("darkslategrey")
+LIGHT_GREY = Color(162, 162, 162)
 BROWN = Color("brown")
 
 
@@ -61,23 +62,32 @@ SPEED_FACTOR_RT_CUT = .3
 
 
 
+def color_gradient(_from: Color, to: Color, len: int):
+    return [color_lerp(_from=_from, to=to, stop=i / len) for i in range(0, len)]
+
+
+
 def color_boomerang(_from: Color, to: Color, len: int):
-    return [color_lerp(_from=_from, to=to, stop=i / len) for i in range(0, len)] + \
-           [color_lerp(_from=to, to=_from, stop=i / len) for i in range(0, len)]  # reversed gradient
+    return color_gradient(_from, to, len) + color_gradient(to, _from, len)
 
 
 
 GRADIENT_LEN = 100  # needs to be even (divided below)
 ACTIVE_GRADIENT: List[Color] = color_boomerang(_from=RED, to=GREEN, len=(GRADIENT_LEN // 2))
-IGNORED_GRADIENT: List[Color] = color_boomerang(_from=YELLOW, to=RED, len=(GRADIENT_LEN // 2))
+IGNORED_GRADIENT: List[Color] = color_gradient(_from=LIGHT_GREY, to=YELLOW, len=20)
 
 
 
-def _get_cell_color(state: CellState, kind: CellKind, regular_kind:CellKind, gradient=0) -> Optional[Color]:
+def _get_cell_color(state: CellState,
+                    kind: CellKind,
+                    regular_kind: CellKind,
+                    gradient=0,
+                    saturate_gradient=False) -> Optional[Color]:
     if state == CellState.ACTIVE and kind == regular_kind and gradient > 0:
-        return ACTIVE_GRADIENT[gradient % GRADIENT_LEN]
+        return ACTIVE_GRADIENT[gradient % len(ACTIVE_GRADIENT)]
     elif state == CellState.IGNORED and kind == regular_kind and gradient > 0:
-        return IGNORED_GRADIENT[gradient % GRADIENT_LEN]
+        gradient = min(gradient, len(IGNORED_GRADIENT) - 1) if saturate_gradient else gradient % len(IGNORED_GRADIENT)
+        return IGNORED_GRADIENT[gradient]
     elif state:
         return cell_colors[kind][state]
     else:
@@ -260,17 +270,18 @@ class VirtualSurfacePen(GridPen):
                      *walls: Wall,
                      state: CellState = CellState.NORMAL,
                      global_update: bool = False,
-                     gradient=0) -> None:
+                     gradient=0,
+                     saturate_gradient=False) -> None:
 
         def get_color(wall: Wall):
             kind = CellKind.WALL_ON if self.maze.has_wall(wall) else CellKind.WALL_OFF
-            return _get_cell_color(state, kind, gradient=gradient, regular_kind=CellKind.WALL_OFF)
+            return _get_cell_color(state, kind, gradient=gradient, regular_kind=CellKind.WALL_OFF, saturate_gradient=saturate_gradient)
 
 
         self._batched_update(walls, get_color, get_rect=self._wall_rect, global_update=global_update)
 
 
-    def update_cells(self, *cells: Cell, state: CellStateSelector, global_update: bool = False, gradient=0) -> None:
+    def update_cells(self, *cells: Cell, state: CellStateSelector, global_update: bool = False, gradient=0, saturate_gradient=False) -> None:
 
         sel = state_selector(state)
 
@@ -278,7 +289,7 @@ class VirtualSurfacePen(GridPen):
         def get_color(cell: Cell):
             s: CellState = sel(cell)
             kind = self.get_kind(cell)
-            return _get_cell_color(state=s, kind=kind, gradient=gradient, regular_kind=CellKind.REGULAR)
+            return _get_cell_color(state=s, kind=kind, gradient=gradient, regular_kind=CellKind.REGULAR, saturate_gradient=saturate_gradient)
 
 
         self._batched_update(cells, get_color, get_rect=self._cell_rect, global_update=global_update)

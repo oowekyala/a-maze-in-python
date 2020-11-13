@@ -259,6 +259,7 @@ class DeadEndFillingSolver(SolverAlgo):
         maze = pen.maze
 
         filled = maze.new_cell_set()
+        generation = 1
         while True:
             # Scan maze to find dead ends
 
@@ -279,17 +280,19 @@ class DeadEndFillingSolver(SolverAlgo):
                 maze.random.shuffle(dead_ends)
 
             for c, walls in dead_ends:
+                generation = 1
                 # fill up the dead end
                 while is_dead_end(c, walls):
                     wall, = walls
-                    pen.update_cells(c, state=CellState.IGNORED)
-                    pen.update_walls(wall, state=CellState.IGNORED)
+                    pen.update_cells(c, state=CellState.IGNORED, gradient=generation, saturate_gradient=True)
+                    pen.update_walls(wall, state=CellState.IGNORED, gradient=generation, saturate_gradient=True)
                     filled += c
 
                     pen.tick_frame(self)
 
                     c = wall.next_cell
                     walls = maze.walls_around(c, only_passages=True, blacklist=filled)
+                    generation += 1
 
         # use the dfs solver to trace the best path
         DfsSolver(heuristic=NoHeuristic()).solve(pen, visited=filled)

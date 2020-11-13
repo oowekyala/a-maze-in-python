@@ -84,10 +84,10 @@ class GridPen(metaclass=ABCMeta):
         self.update_walls(*walls, state=state, gradient=gradient)
 
 
-    def update_walls(self, *walls: Wall, state: CellState = CellState.NORMAL, global_update: bool = False, gradient=0) -> None:
+    def update_walls(self, *walls: Wall, state: CellState = CellState.NORMAL, global_update: bool = False, gradient=0, saturate_gradient=False) -> None:
         pass
 
-    def update_cells(self, *cells: Cell, state: CellStateSelector, global_update: bool = False, gradient=0) -> None:
+    def update_cells(self, *cells: Cell, state: CellStateSelector, global_update: bool = False, gradient=0, saturate_gradient=False) -> None:
         pass
 
 
