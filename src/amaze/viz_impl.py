@@ -395,7 +395,8 @@ solver_map = {
     "DFS (Manhattan heuristic)": DfsSolver(heuristic=ManhattanDistance()),
     "DFS (no heuristic)": DfsSolver(heuristic=NoHeuristic()),
     "BFS": BfsSolver(),
-    "Dead-end filler": DeadEndFillingSolver(),
+    "Dead-end filler": DeadEndFillingSolver(shuffled=False),
+    "Dead-end filler (random)": DeadEndFillingSolver(shuffled=True),
     "Right-hand rule": HandRuleSolver(is_right_hand_rule=True),
     "Left-hand rule": HandRuleSolver(is_right_hand_rule=False),
     "No solver": NoSolver()

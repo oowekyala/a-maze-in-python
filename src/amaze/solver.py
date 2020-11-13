@@ -252,6 +252,9 @@ class HandRuleSolver(SolverAlgo):
 
 class DeadEndFillingSolver(SolverAlgo):
 
+    def __init__(self, shuffled=False):
+        self.shuffled = shuffled
+
     def solve(self, pen: GridPen) -> None:
         maze = pen.maze
 
@@ -271,6 +274,9 @@ class DeadEndFillingSolver(SolverAlgo):
 
             if len(dead_ends) == 0:
                 break
+
+            if self.shuffled:
+                maze.random.shuffle(dead_ends)
 
             for c, walls in dead_ends:
                 # fill up the dead end
