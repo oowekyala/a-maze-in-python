@@ -69,7 +69,19 @@ def color_boomerang(_from: Color, to: Color, len: int):
 
 GRADIENT_LEN = 100  # needs to be even (divided below)
 ACTIVE_GRADIENT: List[Color] = color_boomerang(_from=RED, to=GREEN, len=(GRADIENT_LEN // 2))
+IGNORED_GRADIENT: List[Color] = color_boomerang(_from=YELLOW, to=RED, len=(GRADIENT_LEN // 2))
 
+
+
+def _get_cell_color(state: CellState, kind: CellKind, regular_kind:CellKind, gradient=0) -> Optional[Color]:
+    if state == CellState.ACTIVE and kind == regular_kind and gradient > 0:
+        return ACTIVE_GRADIENT[gradient % GRADIENT_LEN]
+    elif state == CellState.IGNORED and kind == regular_kind and gradient > 0:
+        return IGNORED_GRADIENT[gradient % GRADIENT_LEN]
+    elif state:
+        return cell_colors[kind][state]
+    else:
+        return None
 
 
 class WindowTermination(Exception):
@@ -252,10 +264,7 @@ class VirtualSurfacePen(GridPen):
 
         def get_color(wall: Wall):
             kind = CellKind.WALL_ON if self.maze.has_wall(wall) else CellKind.WALL_OFF
-            if state == CellState.ACTIVE and kind == CellKind.WALL_OFF and gradient > 0:
-                return ACTIVE_GRADIENT[gradient % GRADIENT_LEN]
-            else:
-                return cell_colors[kind][state]
+            return _get_cell_color(state, kind, gradient=gradient, regular_kind=CellKind.WALL_OFF)
 
 
         self._batched_update(walls, get_color, get_rect=self._wall_rect, global_update=global_update)
@@ -269,12 +278,7 @@ class VirtualSurfacePen(GridPen):
         def get_color(cell: Cell):
             s: CellState = sel(cell)
             kind = self.get_kind(cell)
-            if s == CellState.ACTIVE and kind == CellKind.REGULAR and gradient > 0:
-                return ACTIVE_GRADIENT[gradient % GRADIENT_LEN]
-            elif s:
-                return cell_colors[kind][s]
-            else:
-                return None
+            return _get_cell_color(state=s, kind=kind, gradient=gradient, regular_kind=CellKind.REGULAR)
 
 
         self._batched_update(cells, get_color, get_rect=self._cell_rect, global_update=global_update)
