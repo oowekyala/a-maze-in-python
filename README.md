@@ -8,12 +8,12 @@ are slowed down, the algorithms perform well even on big mazes. There
 are several options to control execution speed directly from the control
 panel (slow down/speed up execution).
 
-Only tested under Ubuntu 18.04. You need pygame, Pypy's bitarray module,
-tkinter, and Python >= 3.6:
+Only tested under Ubuntu 21.04 with Python 3.9. You need pygame 2.0.1, and a few other modules:
 ```bash
 sudo apt-get install python3-tk
 cat DEPENDENCIES | xargs pip3 install
 ```
+Might work on other setups, it used to work on Ubuntu 18.04 with python 3.6.
 
 Running in Bash:
 
