@@ -102,7 +102,7 @@ class Cell(NamedTuple):
         """
 
         def __init__(self, height: int, width: int, barr: bitarray):
-            assert barr.length() == (height * width)
+            assert len(barr) == (height * width)
 
             self.__arr = barr
             self.height = height
@@ -121,7 +121,7 @@ class Cell(NamedTuple):
 
         def __contains__(self, item: 'Cell'):
             p = self.__position_of(item)
-            return 0 <= p < self.__arr.length() and self.__arr[p]
+            return 0 <= p < len(self.__arr) and self.__arr[p]
 
 
         def __iadd__(self, other: 'Cell'):

@@ -364,27 +364,31 @@ class SidewinderGenerate(GenerationAlgo):
         pen.update_cells(*top_row, state=CellState.NORMAL)
         pen.update_walls(*top_walls)
 
-        active: List[Wall] = []
+        # `active` contains a bunch of cells in the active row that 
+        # are only connected horizontally, and don't have a connection 
+        # to the above row yet.
+        active: List[Cell] = []
 
         for row in range(1, maze.nrows):
-
             for col in range(0, maze.ncols):
                 cell = Cell(row, col)
                 break_north = maze.random.randint(0, 1)
-                if col == maze.ncols - 1 or break_north:
-                    pen.update_cells(cell, state=CellState.NORMAL)
 
-                    # cleanup active set
-                    active.append(cell.wall(Side.WEST))
-                    (cell, _) = maze.random.choice(active)
-                    north_wall = Wall(cell, Side.NORTH)
-                    _break_wall(north_wall, pen)
+                if col == maze.ncols - 1 or break_north:
+                    # it's time to connect our pending `active`
+                    # cells to the maze by breaking one of their top walls.
+                    active.append(cell)
+                    cell = maze.random.choice(active)
+                    _break_wall(cell.wall(Side.NORTH), pen)
+
+                    pen.update_cells(*active, state=CellState.NORMAL)
                     active.clear()
                 else:
-                    east_wall = Wall(cell, Side.EAST)
+                    # grow the active set
+                    east_wall = cell.wall(Side.EAST)
                     _break_wall(east_wall, pen)
-                    pen.update_cells(cell, east_wall.next_cell, state=CellState.NORMAL)
-                    active.append(east_wall)
+                    pen.update_cells(cell, east_wall.next_cell, state=CellState.ACTIVE)
+                    active.append(cell)
 
                 pen.tick_frame(self)
 
